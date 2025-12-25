@@ -4,7 +4,7 @@
  * Responsibilities:
  * - Maintain a persistent Cairo + Pango rendering context for frame decoration drawing
  * - Render window frame decorations (border/title/buttons) onto an XCB window using cairo-xcb
- * - Support partial redraw via dirty regions (damage)
+ * - Support partial redraw via dirty regions
  *
  * Threading:
  * - Not thread-safe

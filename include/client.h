@@ -33,7 +33,6 @@ extern "C" {
 #include <cairo/cairo.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <xcb/damage.h>
 #include <xcb/xcb.h>
 
 #include "ds.h"
@@ -253,8 +252,6 @@ typedef struct client_hot {
     xcb_colormap_t frame_colormap;
     bool frame_colormap_owned;
 
-    xcb_damage_damage_t damage;
-    dirty_region_t damage_region;
     dirty_region_t frame_damage;
 
     manage_phase_t manage_phase;

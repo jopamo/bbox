@@ -628,6 +628,61 @@ void wm_handle_configure_request(server_t* s, handle_t h, pending_config_t* ev) 
               hot->desired.w, hot->desired.h, ev->mask);
 }
 
+void wm_handle_restack_request(server_t* s, handle_t h, xcb_window_t sibling_win, uint8_t stack_mode) {
+    client_hot_t* hot = server_chot(s, h);
+    if (!hot) return;
+
+    handle_t sibling_h = (sibling_win != XCB_NONE) ? server_get_client_by_window(s, sibling_win) : HANDLE_INVALID;
+    client_hot_t* sib = (sibling_h != HANDLE_INVALID) ? server_chot(s, sibling_h) : NULL;
+    bool have_sibling = (sib != NULL);
+    bool same_layer = have_sibling && hot->layer == sib->layer;
+
+    switch (stack_mode) {
+        case XCB_STACK_MODE_ABOVE:
+            if (have_sibling) {
+                stack_place_above(s, h, sibling_h);
+            } else {
+                stack_raise(s, h);
+            }
+            break;
+        case XCB_STACK_MODE_BELOW:
+            if (have_sibling) {
+                stack_place_below(s, h, sibling_h);
+            } else {
+                stack_lower(s, h);
+            }
+            break;
+        case XCB_STACK_MODE_TOP_IF:
+            if (!have_sibling || !same_layer || !wm_is_above_in_layer(s, hot, sib)) {
+                if (have_sibling)
+                    stack_place_above(s, h, sibling_h);
+                else
+                    stack_raise(s, h);
+            }
+            break;
+        case XCB_STACK_MODE_BOTTOM_IF:
+            if (!have_sibling || !same_layer) {
+                stack_lower(s, h);
+            } else if (wm_is_above_in_layer(s, hot, sib)) {
+                stack_place_below(s, h, sibling_h);
+            }
+            break;
+        case XCB_STACK_MODE_OPPOSITE:
+            if (have_sibling && same_layer) {
+                if (wm_is_above_in_layer(s, hot, sib)) {
+                    stack_place_below(s, h, sibling_h);
+                } else {
+                    stack_place_above(s, h, sibling_h);
+                }
+            } else {
+                stack_raise(s, h);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void wm_handle_configure_notify(server_t* s, handle_t h, xcb_configure_notify_event_t* ev) {
     (void)s;
     client_hot_t* hot = server_chot(s, h);

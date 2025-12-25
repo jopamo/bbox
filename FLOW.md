@@ -41,7 +41,6 @@ These invariants are architectural and must not be violated:
 
 - Connect to X using `xcb_connect_cached` and set the X socket non-blocking.
 - Allocate keysyms for keybinding lookup.
-- Detect XDamage extension availability.
 - Load configuration and theme in priority order:
   - `$XDG_CONFIG_HOME/hxm/hxm.conf` and `themerc`
   - `$HOME/.config/hxm/hxm.conf` and `themerc`
@@ -95,7 +94,7 @@ Per-tick timing and counters are recorded and exposed via `--dump-stats`.
 tick.
 
 Coalescing rules:
-- `Expose` and `Damage` are coalesced per drawable with dirty-region union.
+- `Expose` is coalesced per drawable with dirty-region union.
 - `ConfigureRequest` is coalesced per window; last request wins.
 - `ConfigureNotify` is coalesced per window; last wins.
 - `PropertyNotify` is coalesced per `(window, atom)`.
@@ -137,9 +136,7 @@ Ingestion performs no state mutation beyond event bucketing.
    - Server-side geometry tracking
 9. Property notifies:
    - Mark client fields dirty (title, hints, struts)
-10. Damage:
-    - Accumulate dirty regions per client
-11. Commit:
+10. Commit:
     - Flush model changes to X (`wm_flush_dirty`)
 
 No X requests are emitted outside step 11.
@@ -190,7 +187,6 @@ When `pending_replies` reaches zero, management either completes or aborts.
 - Create a frame window matching client visual and depth.
 - Reparent the client into the frame and publish `_NET_FRAME_EXTENTS`.
 - Map or unmap based on workspace visibility.
-- Register damage tracking if supported.
 - Install passive button grabs for focus and Alt-based move/resize.
 - Insert into stacking lists and focus history.
 - Focus the new client when appropriate.
@@ -240,7 +236,7 @@ Workspace state is tracked via `desktop_count` and `current_desktop`:
 ## Rendering pipeline
 
 - Frames are rendered using Cairo and Pango (`render_frame`).
-- Expose and XDamage events drive dirty-region redraws via
+- Expose events drive dirty-region redraws via
   `frame_redraw_region`.
 - The menu is a separate override-redirect window with its own render context.
 

@@ -62,10 +62,17 @@ typedef struct pending_config {
     uint16_t width, height;
     uint16_t border_width;
 
+    /* sibling/stack_mode are NOT stored here anymore (see pending_restack_t) */
+    uint16_t mask; /* geometry-only value_mask */
+} pending_config_t;
+
+/* Pending restack request (order-sensitive) */
+typedef struct pending_restack {
+    xcb_window_t window;
     xcb_window_t sibling;
     uint8_t stack_mode;
-    uint16_t mask; /* value_mask from the request */
-} pending_config_t;
+    uint16_t mask; /* only stack-related bits */
+} pending_restack_t;
 
 /* Event buckets for coalescing */
 typedef struct event_buckets {
@@ -81,7 +88,7 @@ typedef struct event_buckets {
     /* Expose coalesced by window: window -> dirty_region_t* */
     hash_map_t expose_regions;
 
-    /* ConfigureRequest coalesced by window: window -> pending_config_t* */
+    /* ConfigureRequest geometry coalesced by window: window -> pending_config_t* */
     hash_map_t configure_requests;
 
     /* ConfigureNotify coalesced by window: window -> xcb_configure_notify_event_t* */
@@ -90,22 +97,21 @@ typedef struct event_buckets {
     /* Destroy tracker for this tick: window -> (void*)1 */
     hash_map_t destroyed_windows;
 
-    /* PropertyNotify coalesced by (window, atom): combined key -> xcb_property_notify_event_t* or small sentinel */
-    hash_map_t property_notifies;
+    /* PropertyNotify split:
+     * - property_fifo: "must-queue" atoms (state transitions) -> xcb_property_notify_event_t*
+     * - property_lww: everything else -> xcb_property_notify_event_t* (per (window, atom))
+     */
+    small_vec_t property_fifo;
+    hash_map_t property_lww;
 
     /* MotionNotify latest per window: window -> xcb_motion_notify_event_t* */
     hash_map_t motion_notifies;
 
-    /* Enter/Leave latest (not per-window), used for pointer focus rules */
-    struct {
-        xcb_enter_notify_event_t enter;
-        xcb_leave_notify_event_t leave;
-        bool enter_valid;
-        bool leave_valid;
-    } pointer_notify;
+    /* Enter/Leave FIFO (order matters for focus) */
+    small_vec_t pointer_events; /* xcb_enter_notify_event_t* or xcb_leave_notify_event_t* */
 
-    /* Damage events coalesced by drawable: drawable -> dirty_region_t* */
-    hash_map_t damage_regions;
+    /* Restack requests FIFO (order matters) */
+    small_vec_t restack_requests; /* pending_restack_t* */
 
     /* RandR coalescing */
     bool randr_dirty;
@@ -180,10 +186,6 @@ typedef struct server {
     int timer_fd;
 
     /* Extension support flags */
-    bool damage_supported;
-    uint8_t damage_event_base;
-    uint8_t damage_error_base;
-
     bool randr_supported;
     uint8_t randr_event_base;
 

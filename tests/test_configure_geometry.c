@@ -239,8 +239,6 @@ static void test_configure_request_ignores_border_and_stack_fields(void) {
     pc.width = 180;
     pc.height = 90;
     pc.border_width = 7;
-    pc.sibling = 9999;
-    pc.stack_mode = 3;
 
     wm_handle_configure_request(&s, h, &pc);
     assert(hot->desired.x == 12);

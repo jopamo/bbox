@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <xcb/damage.h>
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
@@ -15,7 +14,6 @@
 // Since xcb_stubs.c defines them as strong symbols, we must use --wrap in linker.
 
 // Flags for controlling mocks
-static bool fail_damage_reply = false;
 static bool fail_randr_reply = false;
 static xcb_window_t restore_active_window = XCB_NONE;
 
@@ -26,21 +24,6 @@ const xcb_query_extension_reply_t* __wrap_xcb_get_extension_data(xcb_connection_
     const xcb_query_extension_reply_t* r = __real_xcb_get_extension_data(c, ext);
     // Cast away const to force present=1 for our tests
     ((xcb_query_extension_reply_t*)r)->present = 1;
-    return r;
-}
-
-// Damage query version reply wrapper
-xcb_damage_query_version_reply_t* __wrap_xcb_damage_query_version_reply(xcb_connection_t* c,
-                                                                        xcb_damage_query_version_cookie_t cookie,
-                                                                        xcb_generic_error_t** e) {
-    (void)c;
-    (void)cookie;
-    (void)e;
-    if (fail_damage_reply) return NULL;
-
-    xcb_damage_query_version_reply_t* r = calloc(1, sizeof(*r));
-    r->major_version = 1;
-    r->minor_version = 1;
     return r;
 }
 
@@ -101,37 +84,11 @@ xcb_get_property_reply_t* __wrap_xcb_get_property_reply(xcb_connection_t* c, xcb
     return __real_xcb_get_property_reply(c, cookie, e);
 }
 
-// Stub for damage query version (needed because xcb_stubs.c doesn't have it)
-xcb_damage_query_version_cookie_t xcb_damage_query_version(xcb_connection_t* c, uint32_t major, uint32_t minor) {
-    (void)c;
-    (void)major;
-    (void)minor;
-    return (xcb_damage_query_version_cookie_t){0};
-}
-
 // We need a way to check results. server_t is modified in place.
 
 void reset_mocks(void) {
-    fail_damage_reply = false;
     fail_randr_reply = false;
     restore_active_window = XCB_NONE;
-}
-
-void damage_fail_test(void) {
-    printf("Running damage_fail_test... ");
-    reset_mocks();
-    fail_damage_reply = true;
-
-    server_t s;
-    memset(&s, 0, sizeof(s));
-    server_init(&s);
-
-    if (s.damage_supported) {
-        fprintf(stderr, "FAILED: damage_supported is true\n");
-        exit(1);
-    }
-    server_cleanup(&s);
-    printf("PASSED\n");
 }
 
 void randr_fail_test(void) {
@@ -169,7 +126,6 @@ void restore_active_test(void) {
 }
 
 int main(void) {
-    damage_fail_test();
     randr_fail_test();
     restore_active_test();
     return 0;

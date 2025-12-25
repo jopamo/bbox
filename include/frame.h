@@ -58,7 +58,7 @@ void frame_cleanup_resources(server_t* s);
  */
 void frame_redraw(server_t* s, handle_t h, uint32_t what);
 
-/* Redraw only the dirty region (damage)
+/* Redraw only the dirty region
  * dirty must point to a valid region description
  */
 void frame_redraw_region(server_t* s, handle_t h, const dirty_region_t* dirty);

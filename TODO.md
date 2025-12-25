@@ -52,21 +52,6 @@ In your test executable link args:
 * Arrange: `__wrap_xcb_key_symbols_alloc` returns `NULL`
 * Assert: exit called
 
-### 1.4 XDamage present but version query reply NULL disables damage
-
-**Covers**: branch at lines ~103–106 (✗)
-
-* Arrange: `xcb_get_extension_data(&xcb_damage_id)` returns `{present=1, first_event=...}`
-* Arrange: `xcb_damage_query_version_reply` returns `NULL`
-* Assert:
-
-  * `s->damage_supported == false`
-  * `s->damage_event_base` may remain but damage_supported is what matters
-
-### 1.4b XDamage coalesces notify events
-
-**Covers**: damage coalescing branch in event_ingest_one (✓)
-
 ### 1.5 RandR present but version query reply NULL disables randr
 
 **Covers**: branch at lines ~118–121 (✗)

@@ -58,9 +58,11 @@ static void setup_server(server_t* s) {
     hash_map_init(&s->buckets.configure_requests);
     hash_map_init(&s->buckets.configure_notifies);
     hash_map_init(&s->buckets.destroyed_windows);
-    hash_map_init(&s->buckets.property_notifies);
+    small_vec_init(&s->buckets.property_fifo);
+    hash_map_init(&s->buckets.property_lww);
     hash_map_init(&s->buckets.motion_notifies);
-    hash_map_init(&s->buckets.damage_regions);
+    small_vec_init(&s->buckets.pointer_events);
+    small_vec_init(&s->buckets.restack_requests);
 }
 
 static void cleanup_server(server_t* s) {
@@ -98,9 +100,11 @@ static void cleanup_server(server_t* s) {
     hash_map_destroy(&s->buckets.configure_requests);
     hash_map_destroy(&s->buckets.configure_notifies);
     hash_map_destroy(&s->buckets.destroyed_windows);
-    hash_map_destroy(&s->buckets.property_notifies);
+    small_vec_destroy(&s->buckets.property_fifo);
+    hash_map_destroy(&s->buckets.property_lww);
     hash_map_destroy(&s->buckets.motion_notifies);
-    hash_map_destroy(&s->buckets.damage_regions);
+    small_vec_destroy(&s->buckets.pointer_events);
+    small_vec_destroy(&s->buckets.restack_requests);
 
     arena_destroy(&s->tick_arena);
     config_destroy(&s->config);
@@ -321,7 +325,7 @@ static void test_map_unmap_property_race(void) {
     prop->window = hot->xid;
     prop->atom = atoms.WM_NAME;
     uint64_t key = ((uint64_t)prop->window << 32) | prop->atom;
-    hash_map_insert(&s.buckets.property_notifies, key, prop);
+    hash_map_insert(&s.buckets.property_lww, key, prop);
 
     event_process(&s);
 

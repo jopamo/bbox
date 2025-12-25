@@ -94,6 +94,7 @@ void wm_handle_button_release(server_t* s, xcb_button_release_event_t* ev);
 void wm_handle_motion_notify(server_t* s, xcb_motion_notify_event_t* ev);
 void wm_handle_client_message(server_t* s, xcb_client_message_event_t* ev);
 void wm_handle_configure_request(server_t* s, handle_t h, pending_config_t* ev);
+void wm_handle_restack_request(server_t* s, handle_t h, xcb_window_t sibling, uint8_t stack_mode);
 void wm_handle_configure_notify(server_t* s, handle_t h, xcb_configure_notify_event_t* ev);
 void wm_handle_property_notify(server_t* s, handle_t h, xcb_property_notify_event_t* ev);
 void wm_handle_colormap_notify(server_t* s, xcb_colormap_notify_event_t* ev);

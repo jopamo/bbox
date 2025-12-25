@@ -176,9 +176,6 @@ void client_manage_start(server_t* s, xcb_window_t win) {
     hot->frame_colormap = XCB_NONE;
     hot->frame_colormap_owned = false;
 
-    hot->damage = XCB_NONE;
-    dirty_region_reset(&hot->damage_region);
-
     hot->ignore_unmap = 1;
     hot->override_redirect = false;
     hot->manage_aborted = false;
@@ -623,12 +620,6 @@ void client_finish_manage(server_t* s, handle_t h) {
 
     hot->dirty |= DIRTY_STATE;
 
-    if (s->damage_supported) {
-        hot->damage = xcb_generate_id(s->conn);
-        xcb_damage_create(s->conn, hot->damage, hot->xid, XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
-        dirty_region_reset(&hot->damage_region);
-    }
-
     // Setup passive grabs for click-to-focus and Alt-move/resize
     client_setup_grabs(s, h);
 
@@ -740,13 +731,6 @@ void client_destroy_resources(server_t* s, handle_t h) {
 
     // 1. Cancel pending cookies
     cookie_jar_cancel_client(&s->cookie_jar, h);
-
-    // 2. Destroy Damage
-    if (hot->damage != XCB_NONE) {
-        xcb_damage_destroy(s->conn, hot->damage);
-        hot->damage = XCB_NONE;
-    }
-    dirty_region_reset(&hot->damage_region);
 
     // 3. Destroy Frame Window
     if (hot->frame != XCB_NONE) {
@@ -942,12 +926,6 @@ void client_unmanage(server_t* s, handle_t h) {
 
         TRACE_LOG("unmanage reparent xid=%u -> root (%d,%d)", hot->xid, root_x, root_y);
         xcb_reparent_window(s->conn, hot->xid, s->root, root_x, root_y);
-
-        if (hot->damage != XCB_NONE) {
-            xcb_damage_destroy(s->conn, hot->damage);
-            hot->damage = XCB_NONE;
-            dirty_region_reset(&hot->damage_region);
-        }
 
         // Remove properties we set
         xcb_delete_property(s->conn, hot->xid, atoms.WM_STATE);

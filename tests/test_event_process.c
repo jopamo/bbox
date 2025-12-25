@@ -116,12 +116,13 @@ static void setup_server(server_t* s) {
     hash_map_init(&s->buckets.configure_requests);
     hash_map_init(&s->buckets.configure_notifies);
     hash_map_init(&s->buckets.destroyed_windows);
-    hash_map_init(&s->buckets.property_notifies);
+    small_vec_init(&s->buckets.property_fifo);
+    hash_map_init(&s->buckets.property_lww);
     hash_map_init(&s->buckets.motion_notifies);
-    hash_map_init(&s->buckets.damage_regions);
+    small_vec_init(&s->buckets.pointer_events);
+    small_vec_init(&s->buckets.restack_requests);
 
     hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
 }
 
 static void cleanup_server(server_t* s) {
@@ -136,9 +137,11 @@ static void cleanup_server(server_t* s) {
     hash_map_destroy(&s->buckets.configure_requests);
     hash_map_destroy(&s->buckets.configure_notifies);
     hash_map_destroy(&s->buckets.destroyed_windows);
-    hash_map_destroy(&s->buckets.property_notifies);
+    small_vec_destroy(&s->buckets.property_fifo);
+    hash_map_destroy(&s->buckets.property_lww);
     hash_map_destroy(&s->buckets.motion_notifies);
-    hash_map_destroy(&s->buckets.damage_regions);
+    small_vec_destroy(&s->buckets.pointer_events);
+    small_vec_destroy(&s->buckets.restack_requests);
 
     hash_map_destroy(&s->window_to_client);
     hash_map_destroy(&s->frame_to_client);

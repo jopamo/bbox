@@ -21,7 +21,6 @@ xcb_xkb_dep = dependency('xcb-xkb')
 xcb_randr_dep = dependency('xcb-randr')
 xcb_xinerama_dep = dependency('xcb-xinerama', required: false)
 xcb_keysyms_dep = dependency('xcb-keysyms', required: false)
-xcb_damage_dep = dependency('xcb-damage')
 xcb_sync_dep = dependency('xcb-sync')
 cairo_dep = dependency('cairo')
 pango_dep = dependency('pango')
@@ -55,7 +54,6 @@ deps = [
   xcb_randr_dep,
   xcb_xinerama_dep,
   xcb_keysyms_dep,
-  xcb_damage_dep,
   xcb_sync_dep,
   xkbcommon_dep,
   cairo_dep,
@@ -160,7 +158,6 @@ test_server_init_extensions = executable('test_server_init_extensions',
   dependencies: deps,
   link_args: [
     '-Wl,--wrap=xcb_get_extension_data',
-    '-Wl,--wrap=xcb_damage_query_version_reply',
     '-Wl,--wrap=xcb_randr_query_version_reply',
     '-Wl,--wrap=xcb_get_property_reply',
   ]
@@ -526,13 +523,6 @@ test_configure_geometry = executable('test_configure_geometry',
   dependencies: deps,
 )
 test('configure_geometry', test_configure_geometry)
-
-test_expose_damage = executable('test_expose_damage',
-  ['tests/test_expose_damage.c', 'tests/xcb_stubs.c'] + test_src,
-  include_directories: incdir,
-  dependencies: deps,
-)
-test('expose_damage', test_expose_damage)
 
 test_race_conditions = executable('test_race_conditions',
   ['tests/test_race_conditions.c', 'tests/xcb_stubs.c'] + test_src,
