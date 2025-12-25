@@ -44,6 +44,7 @@ void test_theme_parser_invalid_keys(void) {
     config_init_defaults(&config);
 
     uint32_t default_border = config.theme.border_width;
+    (void)default_border;
 
     FILE* f = fopen("test_themerc_invalid", "w");
     fprintf(f, "border.width 12\n");  // missing ':'
@@ -52,6 +53,7 @@ void test_theme_parser_invalid_keys(void) {
     fclose(f);
 
     bool loaded = theme_load(&config.theme, "test_themerc_invalid");
+    (void)loaded;
     assert(loaded);
     assert(config.theme.border_width == default_border);
     assert(config.theme.title_height == 30);

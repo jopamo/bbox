@@ -89,6 +89,7 @@ static void test_save_set_insert_and_delete(void) {
 
     handle_t h = add_client(&s, 2001, 2101);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     stub_save_set_insert_count = 0;
     stub_save_set_delete_count = 0;

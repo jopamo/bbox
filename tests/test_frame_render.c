@@ -93,7 +93,7 @@ static void test_frame_render_no_icon(void) {
     // Check top-left pixel (border color) - Inactive -> Green (00FF00)
     uint32_t* pixels = (uint32_t*)stub_last_image_data;
     uint32_t pixel = pixels[0];
-
+    (void)pixel;
     assert(pixel == 0xFF00FF00);  // Green
 
     teardown();
@@ -113,7 +113,7 @@ static void test_frame_render_active_color(void) {
 
     uint32_t* pixels = (uint32_t*)stub_last_image_data;
     uint32_t pixel = pixels[0];
-
+    (void)pixel;
     // Active Border Color: 0xFFFF0000 (Red)
     assert(pixel == 0xFFFF0000);
 
@@ -142,7 +142,7 @@ static void test_frame_controls_position(void) {
     // Pixel at (82, 2) should be button border -> White (0xFFFFFFFF)
 
     uint32_t pixel_btn_border = pixels[2 * stride_pixels + 82];
-
+    (void)pixel_btn_border;
     // Because of anti-aliasing it might not be pure white, but it should definitely NOT be Blue (BG)
     assert(pixel_btn_border != 0xFF0000FF);
 
@@ -179,6 +179,7 @@ static void test_frame_title_background_color(void) {
     int sample_x = border_w + 5;
     int sample_y = title_h / 2;
     uint32_t pixel_inactive = pixels[sample_y * stride_pixels + sample_x];
+    (void)pixel_inactive;
     // Inactive title color is yellow (0xFFFFFF00)
     assert(pixel_inactive == 0xFFFFFF00);
 
@@ -190,6 +191,7 @@ static void test_frame_title_background_color(void) {
 
     pixels = (uint32_t*)stub_last_image_data;  // might be same pointer
     uint32_t pixel_active = pixels[sample_y * stride_pixels + sample_x];
+    (void)pixel_active;
     // Active title color is blue (0xFF0000FF)
     assert(pixel_active == 0xFF0000FF);
 
@@ -220,12 +222,14 @@ static void test_frame_buttons_present(void) {
     int inner_x = btn_x + 5;
     int inner_y = btn_y + 5;
     uint32_t pixel = pixels[inner_y * stride_pixels + inner_x];
+    (void)pixel;
     // Should be title background color (inactive yellow) because button interior is not filled
     // Actually button interior is transparent, so background shows through.
     // The button border is drawn with text color (black for inactive).
     // We'll just ensure it's not border color (green) or something else.
     // For simplicity, check it's not border color.
     uint32_t border_color = s.config.theme.window_inactive_border_color;
+    (void)border_color;
     assert(pixel != border_color);
 
     // Also check a pixel on the button border (top-left corner of button)

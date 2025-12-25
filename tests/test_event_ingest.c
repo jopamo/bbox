@@ -141,6 +141,7 @@ static void test_event_ingest_coalesces_configure_request(void) {
     void* pc_ptr;
     hash_map_get(&s.buckets.configure_requests, win, &pc_ptr);
     pending_config_t* pc = (pending_config_t*)pc_ptr;
+    (void)pc;
     assert(pc != NULL);
     assert(pc->window == win);
     assert(pc->mask ==
@@ -179,6 +180,7 @@ static void test_event_ingest_coalesces_configure_request_split(void) {
     void* pc_ptr;
     hash_map_get(&s.buckets.configure_requests, win, &pc_ptr);
     pending_config_t* pc = (pending_config_t*)pc_ptr;
+    (void)pc;
     assert(pc != NULL);
     assert(pc->window == win);
     assert(pc->mask == XCB_CONFIG_WINDOW_X);
@@ -186,6 +188,7 @@ static void test_event_ingest_coalesces_configure_request_split(void) {
 
     assert(s.buckets.restack_requests.length == 1);
     pending_restack_t* pr = s.buckets.restack_requests.items[0];
+    (void)pr;
     assert(pr->window == win);
     assert(pr->mask == XCB_CONFIG_WINDOW_STACK_MODE);
     assert(pr->stack_mode == XCB_STACK_MODE_ABOVE);
@@ -322,6 +325,7 @@ static void test_event_ingest_coalesces_motion_notify(void) {
     void* final_ev_ptr;
     hash_map_get(&s.buckets.motion_notifies, win, &final_ev_ptr);
     xcb_motion_notify_event_t* final_ev = (xcb_motion_notify_event_t*)final_ev_ptr;
+    (void)final_ev;
     assert(final_ev != NULL);
     assert(final_ev->event_x == 90);
     assert(final_ev->event_y == 90);
@@ -374,6 +378,7 @@ static void test_event_ingest_property_notify_split(void) {
     void* final_prop_ptr;
     hash_map_get(&s.buckets.property_lww, key, &final_prop_ptr);
     xcb_property_notify_event_t* final_prop = (xcb_property_notify_event_t*)final_prop_ptr;
+    (void)final_prop;
     assert(final_prop != NULL);
     assert(final_prop->state == 1);
     assert(s.buckets.coalesced == 1);

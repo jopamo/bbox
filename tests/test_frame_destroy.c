@@ -158,6 +158,7 @@ static void test_frame_destroy_during_interaction_cancels_only(void) {
 
     // Client must still be managed
     client_hot_t* c_after = must_get_client(&s, h);
+    (void)c_after;
     assert(c_after->xid == client_xid);
 
     printf("Passed.\n");
@@ -185,6 +186,7 @@ static void test_frame_unmap_does_not_unmanage_client(void) {
 
     // Client must still be managed
     client_hot_t* c = must_get_client(&s, h);
+    (void)c;
     assert(c->xid == client_xid);
 
     printf("Passed.\n");

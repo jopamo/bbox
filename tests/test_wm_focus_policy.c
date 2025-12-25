@@ -440,6 +440,7 @@ void test_finish_manage_visibility(void) {
     stub_unmap_window_count = 0;
     client_finish_manage(&s, h1);
     client_hot_t* hot1 = server_chot(&s, h1);
+    (void)hot1;
     assert(hot1->state == STATE_UNMAPPED);
     assert(stub_map_window_count == 0);
     assert(stub_unmap_window_count == 0);
@@ -461,6 +462,7 @@ void test_finish_manage_visibility(void) {
     stub_unmap_window_count = 0;
     client_finish_manage(&s, h3);
     client_hot_t* hot3 = server_chot(&s, h3);
+    (void)hot3;
     assert(hot3->state == STATE_MAPPED);
     assert(stub_map_window_count == 2);
     assert(stub_unmap_window_count == 0);
@@ -493,6 +495,7 @@ void test_finish_manage_show_desktop_hides(void) {
     client_finish_manage(&s, h);
 
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
     assert(hot->show_desktop_hidden == true);
     assert(hot->state == STATE_UNMAPPED);
     assert(stub_map_window_count == 2);
@@ -586,6 +589,7 @@ void test_iconify_updates_focus(void) {
     assert(stub_last_prop_atom == atoms.WM_STATE);
     assert(stub_last_prop_len == 2);
     uint32_t* vals = (uint32_t*)stub_last_prop_data;
+    (void)vals;
     assert(vals[0] == XCB_ICCCM_WM_STATE_ICONIC);
 
     printf("test_iconify_updates_focus passed\n");
@@ -626,6 +630,7 @@ void test_restore_maps_window(void) {
     assert(stub_last_prop_atom == atoms.WM_STATE);
     assert(stub_last_prop_len == 2);
     uint32_t* vals = (uint32_t*)stub_last_prop_data;
+    (void)vals;
     assert(vals[0] == XCB_ICCCM_WM_STATE_NORMAL);
 
     printf("test_restore_maps_window passed\n");

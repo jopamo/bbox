@@ -133,6 +133,7 @@ void test_client_close(void) {
     assert(stub_send_event_count == 1);
     assert(stub_last_send_event_destination == 123);
     xcb_client_message_event_t* ev = (xcb_client_message_event_t*)stub_last_event;
+    (void)ev;
     assert(ev->type == atoms.WM_PROTOCOLS);
     assert(ev->data.data32[0] == atoms.WM_DELETE_WINDOW);
 
@@ -203,6 +204,7 @@ void test_wm_take_focus_on_focus(void) {
     assert(stub_send_event_count == 1);
     assert(stub_last_send_event_destination == hot->xid);
     xcb_client_message_event_t* ev = (xcb_client_message_event_t*)stub_last_event;
+    (void)ev;
     assert(ev->type == atoms.WM_PROTOCOLS);
     assert(ev->data.data32[0] == atoms.WM_TAKE_FOCUS);
     assert(ev->data.data32[1] == XCB_CURRENT_TIME);
@@ -286,11 +288,13 @@ void test_wm_state_manage_unmanage(void) {
     const struct stub_prop_call* set = find_prop_call(hot->xid, atoms.WM_STATE, false);
     assert(set != NULL);
     const uint32_t* vals = (const uint32_t*)set->data;
+    (void)vals;
     assert(vals[0] == XCB_ICCCM_WM_STATE_NORMAL);
 
     client_unmanage(&s, h);
 
     const struct stub_prop_call* del = find_prop_call(hot->xid, atoms.WM_STATE, true);
+    (void)del;
     assert(del != NULL);
 
     printf("test_wm_state_manage_unmanage passed\n");

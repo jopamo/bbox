@@ -58,6 +58,8 @@ void test_wm_class_split(void) {
     // Test update with same values (no new allocation in arena ideally, but at least no change)
     char* old_instance = cold->wm_instance;
     char* old_class = cold->wm_class;
+    (void)old_instance;
+    (void)old_class;
     wm_handle_reply(&s, &slot, &mock_r, NULL);
     assert(cold->wm_instance == old_instance);
     assert(cold->wm_class == old_class);

@@ -134,17 +134,20 @@ static void test_rules(void) {
     config_t c;
     config_init_defaults(&c);
     bool res = config_load(&c, path);
+    (void)res;
     assert(res);
 
     assert(c.rules.length == 3);
 
     // Rule 1
     app_rule_t* r1 = c.rules.items[0];
+    (void)r1;
     assert(strcmp(r1->class_match, "Firefox") == 0);
     assert(r1->desktop == 1);
 
     // Rule 2
     app_rule_t* r2 = c.rules.items[1];
+    (void)r2;
     assert(strcmp(r2->title_match, "Error") == 0);
     assert(r2->type_match == WINDOW_TYPE_DIALOG);
     assert(r2->layer == LAYER_ABOVE);
@@ -152,6 +155,7 @@ static void test_rules(void) {
 
     // Rule 3
     app_rule_t* r3 = c.rules.items[2];
+    (void)r3;
     assert(strcmp(r3->instance_match, "term") == 0);
     assert(r3->placement == PLACEMENT_CENTER);
 
@@ -173,6 +177,7 @@ static void test_theme(void) {
     theme_t t;
     memset(&t, 0, sizeof(t));
     bool res = theme_load(&t, path);
+    (void)res;
     assert(res);
 
     assert(t.border_width == 10);
@@ -200,6 +205,7 @@ static void test_invalid(void) {
     config_init_defaults(&c);
     // Should not crash, just warn
     bool res = config_load(&c, path);
+    (void)res;
     assert(res);  // Still returns true if file exists
 
     config_destroy(&c);
@@ -212,6 +218,7 @@ static void test_missing_file(void) {
     config_t c;
     config_init_defaults(&c);
     bool res = config_load(&c, "/non/existent/path/config");
+    (void)res;
     assert(!res);
     config_destroy(&c);
     printf("test_missing_file passed\n");

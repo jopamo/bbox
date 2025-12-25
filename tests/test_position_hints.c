@@ -94,6 +94,7 @@ static void test_position_clamped_without_hint(void) {
 
     handle_t h = add_client(&s, -10, -10, 120, 80);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     wm_place_window(&s, h);
     assert(hot->desired.x == 0);

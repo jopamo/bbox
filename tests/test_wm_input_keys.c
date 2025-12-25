@@ -478,6 +478,7 @@ static void test_wm_clean_mods_masks_lock_num_scroll(void) {
     in |= (1u << 0);  // some other mod bit
 
     uint32_t out = wm_clean_mods(in);
+    (void)out;
     assert((out & XCB_MOD_MASK_LOCK) == 0);
     assert((out & XCB_MOD_MASK_2) == 0);
     assert((out & XCB_MOD_MASK_5) == 0);
@@ -495,7 +496,9 @@ static void test_safe_atoi_cases(void) {
 
 static void test_is_focusable_rules(void) {
     client_hot_t c = make_client(10, 0, false, STATE_MAPPED, WINDOW_TYPE_NORMAL);
+    (void)c;
     server_t s = make_server(NULL, 0, NULL);
+    (void)s;
     s.current_desktop = 0;
 
     // mapped, same desktop, normal -> true

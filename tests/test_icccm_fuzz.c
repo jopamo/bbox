@@ -19,8 +19,10 @@ extern bool xcb_stubs_enqueue_queued_event(xcb_generic_event_t* ev);
 #define HINT_WORDS ((sizeof(xcb_size_hints_t) + 3) / 4)
 #define HINT_EXTRA_WORDS 4
 
-static const size_t MAX_TITLE_BYTES = 4096;
+static const size_t __attribute__((unused)) MAX_TITLE_BYTES = 4096;
 
+static xcb_generic_event_t* make_reparent_event(xcb_window_t win, xcb_window_t parent, uint8_t override_redirect)
+    __attribute__((unused));
 static xcb_generic_event_t* make_reparent_event(xcb_window_t win, xcb_window_t parent, uint8_t override_redirect) {
     xcb_reparent_notify_event_t* ev = calloc(1, sizeof(*ev));
     ev->response_type = XCB_REPARENT_NOTIFY;

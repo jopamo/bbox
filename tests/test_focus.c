@@ -52,6 +52,7 @@ void test_should_focus_on_map(void) {
     hot.type = WINDOW_TYPE_NORMAL;
     hot.transient_for = HANDLE_INVALID;
     bool result = should_focus_on_map(&hot);
+    (void)result;
     assert(result == false);
 
     // Dialog window should focus

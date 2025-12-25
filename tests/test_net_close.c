@@ -68,6 +68,7 @@ void test_net_close_window(void) {
     assert(stub_last_send_event_destination == 123);
 
     xcb_client_message_event_t* sent_ev = (xcb_client_message_event_t*)stub_last_event;
+    (void)sent_ev;
     assert(sent_ev->type == atoms.WM_PROTOCOLS);
     assert(sent_ev->data.data32[0] == atoms.WM_DELETE_WINDOW);
 

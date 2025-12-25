@@ -105,6 +105,7 @@ void test_frame_extents(void) {
         assert(stub_last_prop_type == XCB_ATOM_CARDINAL);
         assert(stub_last_prop_len == 4);
         uint32_t* extents = (uint32_t*)stub_last_prop_data;
+        (void)extents;
         // bw=5, th=20 -> {5, 5, 25, 5}
         assert(extents[0] == 5);   // left
         assert(extents[1] == 5);   // right
@@ -180,6 +181,8 @@ void test_allowed_actions(void) {
         if (acts[i] == atoms._NET_WM_ACTION_MOVE) has_move = true;
         if (acts[i] == atoms._NET_WM_ACTION_RESIZE) has_resize = true;
     }
+    (void)has_move;
+    (void)has_resize;
     assert(has_move);
     assert(has_resize);
 
@@ -202,6 +205,8 @@ void test_allowed_actions(void) {
         if (acts[i] == atoms._NET_WM_ACTION_MOVE) has_move = true;
         if (acts[i] == atoms._NET_WM_ACTION_RESIZE) has_resize = true;
     }
+    (void)has_move;
+    (void)has_resize;
     assert(has_move);
     assert(!has_resize);  // Should NOT have resize
 
@@ -276,9 +281,11 @@ void test_desktop_clamp_single(void) {
         if (stub_prop_calls[i].window == 123 && stub_prop_calls[i].atom == atoms._NET_WM_DESKTOP) {
             found_desktop = true;
             uint32_t* val = (uint32_t*)stub_prop_calls[i].data;
+            (void)val;
             assert(val[0] == 0);
         }
     }
+    (void)found_desktop;
     assert(found_desktop);
 
     printf("test_desktop_clamp_single passed\n");
