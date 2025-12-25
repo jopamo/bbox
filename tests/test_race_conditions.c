@@ -26,10 +26,10 @@ static void setup_server(server_t* s) {
     s->root_depth = 24;
     s->root_visual_type = xcb_get_visualtype(s->conn, 0);
     list_init(&s->focus_history);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
-    small_vec_init(&s->active_clients);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
+    handle_vec_init(&s->active_clients);
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
 }
@@ -47,11 +47,12 @@ static void cleanup_server(server_t* s) {
             }
         }
     }
-    small_vec_destroy(&s->active_clients);
+    handle_vec_destroy(&s->active_clients);
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     xcb_disconnect(s->conn);
 }
 

@@ -59,12 +59,12 @@ static void setup_server(server_t* s) {
     arena_init(&s->tick_arena, 4096);
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 32, sizeof(client_hot_t), sizeof(client_cold_t));
-    small_vec_init(&s->active_clients);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    handle_vec_init(&s->active_clients);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     list_init(&s->focus_history);
 
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 }
 
 static void cleanup_server(server_t* s) {
@@ -81,10 +81,10 @@ static void cleanup_server(server_t* s) {
     }
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    small_vec_destroy(&s->active_clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    handle_vec_destroy(&s->active_clients);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     arena_destroy(&s->tick_arena);
     config_destroy(&s->config);
     xcb_disconnect(s->conn);
@@ -117,9 +117,9 @@ static handle_t add_mapped_client(server_t* s, xcb_window_t win, xcb_window_t fr
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s->window_to_client, win, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, frame, handle_to_ptr(h));
-    small_vec_push(&s->active_clients, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, win, (uint64_t)h);
+    hash_map_u64_insert(&s->frame_to_client, frame, (uint64_t)h);
+    handle_vec_push(&s->active_clients, h);
 
     return h;
 }
@@ -394,6 +394,7 @@ static void test_state_idempotent_and_unknown(void) {
 
     handle_t h = add_mapped_client(&s, 5001, 5101);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     wm_client_update_state(&s, h, 1, atoms._NET_WM_STATE_ABOVE);
     wm_client_update_state(&s, h, 1, atoms._NET_WM_STATE_ABOVE);
@@ -413,7 +414,8 @@ static void test_state_idempotent_and_unknown(void) {
     cleanup_server(&s);
 }
 
-static bool atom_in_state_list(const xcb_atom_t* atoms_list, uint32_t count, xcb_atom_t needle) {
+static bool __attribute__((unused)) atom_in_state_list(const xcb_atom_t* atoms_list, uint32_t count,
+                                                       xcb_atom_t needle) {
     for (uint32_t i = 0; i < count; i++) {
         if (atoms_list[i] == needle) return true;
     }

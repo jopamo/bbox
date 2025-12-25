@@ -31,9 +31,9 @@ static void setup_server(server_t* s) {
     s->config.fullscreen_use_workarea = false;
     s->workarea = (rect_t){0, 0, 800, 600};
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
 }
 
@@ -50,9 +50,9 @@ static void cleanup_server(server_t* s) {
         }
     }
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     config_destroy(&s->config);
     free(s->conn);
 }
@@ -78,8 +78,8 @@ static handle_t add_client(server_t* s) {
     list_init(&hot->focus_node);
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
-    hash_map_insert(&s->window_to_client, hot->xid, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, hot->xid, h);
+    hash_map_u64_insert(&s->frame_to_client, hot->frame, h);
     return h;
 }
 
@@ -91,6 +91,7 @@ void test_fullscreen_decorations(void) {
 
     handle_t h = add_client(&s);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     wm_client_update_state(&s, h, 1, atoms._NET_WM_STATE_FULLSCREEN);
 
@@ -154,7 +155,7 @@ void test_above_below_state_layers(void) {
 
     handle_t h = add_client(&s);
     client_hot_t* hot = server_chot(&s, h);
-
+    (void)hot;
     wm_client_update_state(&s, h, 1, atoms._NET_WM_STATE_ABOVE);
     assert(hot->state_above == true);
     assert(hot->state_below == false);
@@ -184,6 +185,7 @@ void test_hidden_state_iconify_restore(void) {
 
     handle_t h = add_client(&s);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
     stack_raise(&s, h);
 
     stub_unmap_window_count = 0;
@@ -194,6 +196,7 @@ void test_hidden_state_iconify_restore(void) {
     assert(stub_unmap_window_count == 1);
     assert(stub_last_prop_atom == atoms.WM_STATE);
     uint32_t* vals = (uint32_t*)stub_last_prop_data;
+    (void)vals;
     assert(vals[0] == XCB_ICCCM_WM_STATE_ICONIC);
 
     stub_map_window_count = 0;

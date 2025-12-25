@@ -122,7 +122,7 @@ void wm_publish_workarea(server_t* s, const rect_t* wa) {
 
     // Re-apply workarea-dependent geometry for maximized/fullscreen windows
     for (size_t i = 0; i < s->active_clients.length; i++) {
-        handle_t h = ptr_to_handle(s->active_clients.items[i]);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* hot = server_chot(s, h);
         if (!hot) continue;
 
@@ -142,9 +142,9 @@ static uint32_t wm_build_client_list_stacking(server_t* s, xcb_window_t* out, ui
 
     uint32_t idx = 0;
     for (int l = 0; l < LAYER_COUNT; l++) {
-        small_vec_t* v = &s->layers[l];
+        handle_vec_t* v = &s->layers[l];
         for (size_t i = 0; i < v->length; i++) {
-            handle_t h = ptr_to_handle(v->items[i]);
+            handle_t h = handle_vec_get(v, i);
             client_hot_t* hot = server_chot(s, h);
             if (!hot) continue;
             if (hot->state == STATE_UNMANAGING || hot->state == STATE_DESTROYED) continue;
@@ -166,7 +166,7 @@ static uint32_t wm_build_client_list(server_t* s, xcb_window_t* out, uint32_t ca
 
     uint32_t idx = 0;
     for (size_t i = 0; i < s->active_clients.length; i++) {
-        handle_t h = ptr_to_handle(s->active_clients.items[i]);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* hot = server_chot(s, h);
         if (!hot) continue;
         if (hot->state == STATE_UNMANAGING || hot->state == STATE_DESTROYED) continue;
@@ -200,8 +200,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
 
     // 0. Handle new clients ready to be managed
     for (size_t i = 0; i < s->active_clients.length;) {
-        void* ptr = s->active_clients.items[i];
-        handle_t h = ptr_to_handle(ptr);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* hot = server_chot(s, h);
         if (hot && hot->state == STATE_READY) {
             client_finish_manage(s, h);
@@ -209,7 +208,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
         }
 
         // Safe advance: only increment if the element at 'i' hasn't changed (wasn't swapped out)
-        if (i < s->active_clients.length && s->active_clients.items[i] == ptr) {
+        if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) {
             i++;
         }
     }
@@ -218,16 +217,15 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
     if (s->root_dirty & ROOT_DIRTY_VISIBILITY) {
         flushed = true;
         for (size_t i = 0; i < s->active_clients.length;) {
-            void* ptr = s->active_clients.items[i];
-            handle_t h = ptr_to_handle(ptr);
+            handle_t h = handle_vec_get(&s->active_clients, i);
             client_hot_t* c = server_chot(s, h);
             if (!c) {
-                if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+                if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
                 continue;
             }
 
             if (c->state != STATE_MAPPED) {
-                if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+                if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
                 continue;
             }
 
@@ -255,7 +253,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
                                     state_vals);
             }
 
-            if (i < s->active_clients.length && s->active_clients.items[i] == ptr) {
+            if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) {
                 i++;
             }
         }
@@ -263,16 +261,15 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
     }
 
     for (size_t i = 0; i < s->active_clients.length;) {
-        void* ptr = s->active_clients.items[i];
-        handle_t h = ptr_to_handle(ptr);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* hot = server_chot(s, h);
         if (!hot) {
-            if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+            if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
             continue;
         }
 
         if (hot->dirty == DIRTY_NONE) {
-            if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+            if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
             continue;
         }
 
@@ -284,7 +281,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
         }
 
         if (hot->state == STATE_UNMANAGING || hot->state == STATE_DESTROYED || hot->state == STATE_NEW) {
-            if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+            if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
             continue;
         }
 
@@ -307,7 +304,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
                         int ms = (int)(remaining / 1000000) + 1;
                         server_schedule_timer(s, ms);
                     }
-                    if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
+                    if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) i++;
                     continue;
                 }
                 // Flush allowed, update last_interaction_flush for legacy compatibility
@@ -595,7 +592,7 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
             hot->dirty &= ~DIRTY_STATE;
         }
 
-        if (i < s->active_clients.length && s->active_clients.items[i] == ptr) {
+        if (i < s->active_clients.length && handle_vec_get(&s->active_clients, i) == h) {
             i++;
         }
     }

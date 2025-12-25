@@ -17,6 +17,7 @@ static char* write_temp_file(const char* content) {
     assert(fd != -1);
     ssize_t len = strlen(content);
     ssize_t written = write(fd, content, len);
+    (void)written;
     assert(written == len);
     close(fd);
     return path;
@@ -35,6 +36,7 @@ static void test_defaults(void) {
 
     // Verify specific default keybinds
     bool found_term = false;
+    (void)found_term;
     for (size_t i = 0; i < c.key_bindings.length; i++) {
         key_binding_t* b = c.key_bindings.items[i];
         if (b->keysym == XK_Return && b->modifiers == XCB_MOD_MASK_4 && b->action == ACTION_TERMINAL) {
@@ -53,14 +55,15 @@ static void test_load_simple(void) {
         "border_width=5\n"
         "font_name=Monospace 12\n"
         "focus_raise=false\n"
-        "active_bg=#FF0000\n"
-        "desktop_names=Web,Code,Music\n";
+        "desktop_names=Web,Code,Music\n"
+        "active_bg=#FF0000\n";
 
     char* path = write_temp_file(content);
-
     config_t c;
     config_init_defaults(&c);
+
     bool res = config_load(&c, path);
+    (void)res;
     assert(res);
 
     assert(c.desktop_count == 6);
@@ -92,12 +95,14 @@ static void test_keybinds(void) {
     config_t c;
     config_init_defaults(&c);
     bool res = config_load(&c, path);
+    (void)res;
     assert(res);
 
     assert(c.key_bindings.length == 3);
 
     // Check 1: Mod4+Shift+q -> close
     key_binding_t* b1 = c.key_bindings.items[0];
+    (void)b1;
     assert((b1->modifiers & XCB_MOD_MASK_4));
     assert((b1->modifiers & XCB_MOD_MASK_SHIFT));
     assert(b1->keysym == XK_q);
@@ -105,6 +110,7 @@ static void test_keybinds(void) {
 
     // Check 2: Control+Alt+t -> exec terminal
     key_binding_t* b2 = c.key_bindings.items[1];
+    (void)b2;
     assert((b2->modifiers & XCB_MOD_MASK_CONTROL));
     assert((b2->modifiers & XCB_MOD_MASK_1));  // Alt is usually Mod1
     assert(b2->keysym == XK_t);

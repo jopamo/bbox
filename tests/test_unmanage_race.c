@@ -6,6 +6,8 @@
 #include "client.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -18,7 +20,7 @@ void test_idempotent_unmanage(void) {
     s.conn = (xcb_connection_t*)malloc(1);
 
     list_init(&s.focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -48,6 +50,7 @@ void test_idempotent_unmanage(void) {
     client_unmanage(&s, h);
 
     printf("test_idempotent_unmanage passed\n");
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s.layers[i]);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }
@@ -61,7 +64,7 @@ void test_destroy_unmanage_race(void) {
     s.conn = (xcb_connection_t*)malloc(1);
 
     list_init(&s.focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -89,6 +92,7 @@ void test_destroy_unmanage_race(void) {
     client_unmanage(&s, h);
 
     printf("test_destroy_unmanage_race passed\n");
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s.layers[i]);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }

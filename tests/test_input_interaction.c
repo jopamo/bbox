@@ -35,10 +35,11 @@ static void setup_server(server_t* s) {
     config_init_defaults(&s->config);
 
     slotmap_init(&s->clients, 32, sizeof(client_hot_t), sizeof(client_cold_t));
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
+    handle_vec_init(&s->active_clients);
 
     s->desktop_count = 2;
     s->current_desktop = 0;
@@ -46,24 +47,24 @@ static void setup_server(server_t* s) {
 
 static void cleanup_server(server_t* s) {
     for (uint32_t i = 1; i < s->clients.cap; i++) {
-        if (s->clients.hdr[i].live) {
-            handle_t h = handle_make(i, s->clients.hdr[i].gen);
-            client_hot_t* hot = server_chot(s, h);
-            client_cold_t* cold = server_ccold(s, h);
-            if (cold) {
-                arena_destroy(&cold->string_arena);
-            }
-            if (hot) {
-                render_free(&hot->render_ctx);
-                if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
-            }
+        if (!s->clients.hdr[i].live) continue;
+        handle_t h = handle_make(i, s->clients.hdr[i].gen);
+        client_hot_t* hot = server_chot(s, h);
+        client_cold_t* cold = server_ccold(s, h);
+        if (cold) {
+            arena_destroy(&cold->string_arena);
+        }
+        if (hot) {
+            render_free(&hot->render_ctx);
+            if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
         }
     }
     config_destroy(&s->config);
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    handle_vec_destroy(&s->active_clients);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     xcb_disconnect(s->conn);
 }
 
@@ -103,8 +104,8 @@ static handle_t add_mapped_client(server_t* s, xcb_window_t win, xcb_window_t fr
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s->window_to_client, win, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, win, (uint64_t)h);
+    hash_map_u64_insert(&s->frame_to_client, frame, (uint64_t)h);
 
     return h;
 }
@@ -116,6 +117,7 @@ static void test_click_to_focus(void) {
 
     handle_t h1 = add_mapped_client(&s, 1001, 1101);
     handle_t h2 = add_mapped_client(&s, 1002, 1102);
+    (void)h2;
 
     wm_set_focus(&s, h1);
     assert(s.focused_client == h1);

@@ -37,7 +37,7 @@ void wm_set_showing_desktop(server_t* s, bool show) {
 
     if (show) {
         for (size_t i = 0; i < s->active_clients.length; i++) {
-            handle_t h = ptr_to_handle(s->active_clients.items[i]);
+            handle_t h = handle_vec_get(&s->active_clients, i);
             client_hot_t* hot = server_chot(s, h);
             if (!hot || hot->state != STATE_MAPPED) continue;
             if (!wm_should_hide_for_show_desktop(hot)) continue;
@@ -48,7 +48,7 @@ void wm_set_showing_desktop(server_t* s, bool show) {
         wm_set_focus(s, HANDLE_INVALID);
     } else {
         for (size_t i = 0; i < s->active_clients.length; i++) {
-            handle_t h = ptr_to_handle(s->active_clients.items[i]);
+            handle_t h = handle_vec_get(&s->active_clients, i);
             client_hot_t* hot = server_chot(s, h);
             if (hot && hot->show_desktop_hidden) {
                 hot->show_desktop_hidden = false;
@@ -185,7 +185,7 @@ void wm_compute_workarea(server_t* s, rect_t* out) {
 
     // 2. Iterate clients and subtract struts
     for (size_t i = 0; i < s->active_clients.length; i++) {
-        handle_t h = ptr_to_handle(s->active_clients.items[i]);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* c = server_chot(s, h);
         client_cold_t* cold = server_ccold(s, h);
         if (!c || !cold) continue;

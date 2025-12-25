@@ -124,14 +124,14 @@ static void test_net_client_list_published(void) {
     s.root = 1;
     atoms_init(s.conn);
     slotmap_init(&s.clients, 32, sizeof(client_hot_t), sizeof(client_cold_t));
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
     s.desktop_count = 1;
     xcb_stubs_reset();
 
     // Add a client
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
-    small_vec_push(&s.active_clients, handle_to_ptr(h));
+    handle_vec_push(&s.active_clients, h);
     (void)h;
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->xid = 12345;
@@ -144,6 +144,7 @@ static void test_net_client_list_published(void) {
     assert(stub_last_prop_atom == atoms._NET_CLIENT_LIST);
     assert(stub_last_prop_len == 1);
     uint32_t* wins = (uint32_t*)stub_last_prop_data;
+    (void)wins;
     assert(wins[0] == 12345);
 
     printf("PASS: _NET_CLIENT_LIST published\n");
@@ -205,12 +206,15 @@ static void test_existing_wm_keeps_selection_owner(void) {
     wm_flush_dirty(&s1, monotonic_time_ns());
 
     xcb_window_t owner = xcb_stubs_get_selection_owner();
+    (void)owner;
     assert(owner == s1.supporting_wm_check);
     int map_count = stub_map_window_count;
+    (void)map_count;
 
     const struct stub_prop_call* root_call = find_prop_call(s1.root, atoms._NET_SUPPORTING_WM_CHECK);
     assert(root_call != NULL);
     const uint32_t* root_val = (const uint32_t*)root_call->data;
+    (void)root_val;
     assert(root_val[0] == owner);
 
     server_t s2;
@@ -256,6 +260,7 @@ static void test_wm_s0_selection_and_supporting_check(void) {
     assert(root_call->format == 32);
     assert(root_call->len == 1);
     const uint32_t* root_val = (const uint32_t*)root_call->data;
+    (void)root_val;
     assert(root_val[0] == s.supporting_wm_check);
 
     const struct stub_prop_call* support_call = find_prop_call(s.supporting_wm_check, atoms._NET_SUPPORTING_WM_CHECK);
@@ -263,6 +268,7 @@ static void test_wm_s0_selection_and_supporting_check(void) {
     assert(support_call->format == 32);
     assert(support_call->len == 1);
     const uint32_t* support_val = (const uint32_t*)support_call->data;
+    (void)support_val;
     assert(support_val[0] == s.supporting_wm_check);
 
     printf("PASS: WM_S0 and _NET_SUPPORTING_WM_CHECK round-trip\n");

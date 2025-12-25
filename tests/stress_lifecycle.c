@@ -27,11 +27,11 @@ void test_rapid_lifecycle(void) {
     atoms_init(s.conn);
 
     slotmap_init(&s.clients, 1024, sizeof(client_hot_t), sizeof(client_cold_t));
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
     list_init(&s.focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
-    small_vec_init(&s.active_clients);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
+    handle_vec_init(&s.active_clients);
     arena_init(&s.tick_arena, 64 * 1024);
     cookie_jar_init(&s.cookie_jar);
     config_init_defaults(&s.config);
@@ -72,10 +72,10 @@ void test_rapid_lifecycle(void) {
     // Cleanup
     slotmap_for_each_used(&s.clients, stress_cleanup_visitor, &s);
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s.layers[i]);
-    small_vec_destroy(&s.active_clients);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s.layers[i]);
+    handle_vec_destroy(&s.active_clients);
     arena_destroy(&s.tick_arena);
     cookie_jar_destroy(&s.cookie_jar);
     config_destroy(&s.config);

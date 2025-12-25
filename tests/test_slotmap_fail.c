@@ -26,6 +26,7 @@ static void assert_slotmap_init_fails_at(int fail_at) {
     g_fail_at = fail_at;
 
     bool ok = slotmap_init(&sm, 4, sizeof(int), sizeof(int));
+    (void)ok;
     assert(!ok);
     assert(sm.hdr == NULL);
     assert(sm.hot == NULL);

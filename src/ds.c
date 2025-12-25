@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "hash_map_u64.h"
 #include "hxm.h"
 
 __attribute__((weak)) void* ds_malloc(size_t size) { return malloc(size); }
@@ -224,6 +225,141 @@ void small_vec_remove_swap(small_vec_t* v, void* item) {
  * Hash map
  * ----------------------------- */
 
+#define HASH_MAP_IMPL(name, T, T_val, T_entry, null_val)                           \
+    static void name##_resize(T* map, size_t new_capacity) {                       \
+        new_capacity = round_up_pow2(new_capacity);                                \
+                                                                                   \
+        T_entry* new_entries = (T_entry*)ds_calloc(new_capacity, sizeof(T_entry)); \
+        if (!new_entries) {                                                        \
+            LOG_ERROR("hash_map allocation failed");                               \
+            abort();                                                               \
+        }                                                                          \
+                                                                                   \
+        if (map->entries && map->capacity) {                                       \
+            for (size_t i = 0; i < map->capacity; i++) {                           \
+                T_entry* entry = &map->entries[i];                                 \
+                if (entry->key != 0) {                                             \
+                    size_t mask = new_capacity - 1;                                \
+                    size_t idx = entry->hash & mask;                               \
+                    while (new_entries[idx].key != 0) idx = probe_next(idx, mask); \
+                    new_entries[idx] = *entry;                                     \
+                }                                                                  \
+            }                                                                      \
+        }                                                                          \
+                                                                                   \
+        free(map->entries);                                                        \
+        map->entries = new_entries;                                                \
+        map->capacity = new_capacity;                                              \
+        map->max_load = (new_capacity * 3) / 4;                                    \
+    }                                                                              \
+                                                                                   \
+    void name##_init(T* map) {                                                     \
+        map->capacity = 0;                                                         \
+        map->size = 0;                                                             \
+        map->max_load = 0;                                                         \
+        map->entries = NULL;                                                       \
+    }                                                                              \
+                                                                                   \
+    void name##_destroy(T* map) {                                                  \
+        free(map->entries);                                                        \
+        map->entries = NULL;                                                       \
+        map->capacity = 0;                                                         \
+        map->size = 0;                                                             \
+        map->max_load = 0;                                                         \
+    }                                                                              \
+                                                                                   \
+    bool name##_insert(T* map, uint64_t key, T_val value) {                        \
+        assert(key != 0 && "key=0 is reserved for " #name);                        \
+                                                                                   \
+        if (map->capacity == 0 || map->size >= map->max_load) {                    \
+            size_t new_cap = map->capacity ? (map->capacity * 2) : 16;             \
+            name##_resize(map, new_cap);                                           \
+        }                                                                          \
+                                                                                   \
+        uint32_t hash = hash_key(key);                                             \
+        size_t mask = map->capacity - 1;                                           \
+        size_t idx = hash & mask;                                                  \
+                                                                                   \
+        while (map->entries[idx].key != 0) {                                       \
+            if (map->entries[idx].key == key) {                                    \
+                map->entries[idx].value = value;                                   \
+                return true;                                                       \
+            }                                                                      \
+            idx = probe_next(idx, mask);                                           \
+        }                                                                          \
+                                                                                   \
+        map->entries[idx].key = key;                                               \
+        map->entries[idx].value = value;                                           \
+        map->entries[idx].hash = hash;                                             \
+        map->size++;                                                               \
+        return false;                                                              \
+    }                                                                              \
+                                                                                   \
+    bool name##_get(const T* map, uint64_t key, T_val* out_value) {                \
+        assert(key != 0 && "key=0 is reserved for " #name);                        \
+        if (!map || map->capacity == 0) return false;                              \
+                                                                                   \
+        uint32_t hash = hash_key(key);                                             \
+        size_t mask = map->capacity - 1;                                           \
+        size_t idx = hash & mask;                                                  \
+                                                                                   \
+        while (map->entries[idx].key != 0) {                                       \
+            if (map->entries[idx].key == key) {                                    \
+                if (out_value) *out_value = map->entries[idx].value;               \
+                return true;                                                       \
+            }                                                                      \
+            idx = probe_next(idx, mask);                                           \
+        }                                                                          \
+                                                                                   \
+        return false;                                                              \
+    }                                                                              \
+                                                                                   \
+    bool name##_remove(T* map, uint64_t key) {                                     \
+        assert(key != 0 && "key=0 is reserved for " #name);                        \
+        if (!map || map->capacity == 0) return false;                              \
+                                                                                   \
+        size_t mask = map->capacity - 1;                                           \
+        uint32_t hash = hash_key(key);                                             \
+        size_t idx = hash & mask;                                                  \
+                                                                                   \
+        while (map->entries[idx].key != 0) {                                       \
+            if (map->entries[idx].key == key) {                                    \
+                size_t hole = idx;                                                 \
+                size_t j = probe_next(idx, mask);                                  \
+                                                                                   \
+                while (map->entries[j].key != 0) {                                 \
+                    uint32_t h = map->entries[j].hash;                             \
+                    size_t home = h & mask;                                        \
+                                                                                   \
+                    bool should_move;                                              \
+                    if (home <= j) {                                               \
+                        should_move = (home <= hole && hole < j);                  \
+                    } else {                                                       \
+                        should_move = (hole < j) || (home <= hole);                \
+                    }                                                              \
+                                                                                   \
+                    if (should_move) {                                             \
+                        map->entries[hole] = map->entries[j];                      \
+                        hole = j;                                                  \
+                    }                                                              \
+                                                                                   \
+                    j = probe_next(j, mask);                                       \
+                }                                                                  \
+                                                                                   \
+                map->entries[hole].key = 0;                                        \
+                map->entries[hole].value = null_val;                               \
+                map->entries[hole].hash = 0;                                       \
+                                                                                   \
+                map->size--;                                                       \
+                return true;                                                       \
+            }                                                                      \
+                                                                                   \
+            idx = probe_next(idx, mask);                                           \
+        }                                                                          \
+                                                                                   \
+        return false;                                                              \
+    }
+
 static inline uint32_t hash_key(uint64_t key) {
     // MurmurHash3 finalizer for 64-bit keys -> 32-bit hash
     key ^= key >> 33;
@@ -251,133 +387,20 @@ static size_t round_up_pow2(size_t n) {
     return n;
 }
 
-static void hash_map_resize(hash_map_t* map, size_t new_capacity) {
-    new_capacity = round_up_pow2(new_capacity);
+// Instantiate hash_map_t (u64 -> void*)
+HASH_MAP_IMPL(hash_map_impl, hash_map_t, void*, hash_map_entry_t, NULL)
 
-    hash_map_entry_t* new_entries = (hash_map_entry_t*)ds_calloc(new_capacity, sizeof(hash_map_entry_t));
-    if (!new_entries) {
-        LOG_ERROR("hash_map allocation failed");
-        abort();
-    }
+void hash_map_init(hash_map_t* map) { hash_map_impl_init(map); }
 
-    if (map->entries && map->capacity) {
-        for (size_t i = 0; i < map->capacity; i++) {
-            hash_map_entry_t* entry = &map->entries[i];
-            if (entry->key != 0) {
-                size_t mask = new_capacity - 1;
-                size_t idx = entry->hash & mask;
-                while (new_entries[idx].key != 0) idx = probe_next(idx, mask);
-                new_entries[idx] = *entry;
-            }
-        }
-    }
+void hash_map_destroy(hash_map_t* map) { hash_map_impl_destroy(map); }
 
-    free(map->entries);
-    map->entries = new_entries;
-    map->capacity = new_capacity;
-    map->max_load = (new_capacity * 3) / 4;
-}
+bool hash_map_insert(hash_map_t* map, uint64_t key, void* value) { return hash_map_impl_insert(map, key, value); }
 
-void hash_map_init(hash_map_t* map) {
-    map->capacity = 0;
-    map->size = 0;
-    map->max_load = 0;
-    map->entries = NULL;
-}
+bool hash_map_remove(hash_map_t* map, uint64_t key) { return hash_map_impl_remove(map, key); }
 
-void hash_map_destroy(hash_map_t* map) {
-    free(map->entries);
-    map->entries = NULL;
-    map->capacity = 0;
-    map->size = 0;
-    map->max_load = 0;
-}
+// Instantiate hash_map_u64_t (u64 -> u64)
+HASH_MAP_IMPL(hash_map_u64, hash_map_u64_t, uint64_t, hash_map_u64_entry_t, 0)
 
-bool hash_map_insert(hash_map_t* map, uint64_t key, void* value) {
-    assert(key != 0 && "key=0 is reserved for hash_map_t");
-
-    if (map->capacity == 0 || map->size >= map->max_load) {
-        size_t new_cap = map->capacity ? (map->capacity * 2) : 16;
-        hash_map_resize(map, new_cap);
-    }
-
-    uint32_t hash = hash_key(key);
-    size_t mask = map->capacity - 1;
-    size_t idx = hash & mask;
-
-    while (map->entries[idx].key != 0) {
-        if (map->entries[idx].key == key) {
-            map->entries[idx].value = value;
-            return true;
-        }
-        idx = probe_next(idx, mask);
-    }
-
-    map->entries[idx].key = key;
-    map->entries[idx].value = value;
-    map->entries[idx].hash = hash;
-    map->size++;
-    return false;
-}
-
-void* hash_map_get(const hash_map_t* map, uint64_t key) {
-    assert(key != 0 && "key=0 is reserved for hash_map_t");
-    if (!map || map->capacity == 0) return NULL;
-
-    uint32_t hash = hash_key(key);
-    size_t mask = map->capacity - 1;
-    size_t idx = hash & mask;
-
-    while (map->entries[idx].key != 0) {
-        if (map->entries[idx].key == key) return map->entries[idx].value;
-        idx = probe_next(idx, mask);
-    }
-
-    return NULL;
-}
-
-bool hash_map_remove(hash_map_t* map, uint64_t key) {
-    assert(key != 0 && "key=0 is reserved for hash_map_t");
-    if (!map || map->capacity == 0) return false;
-
-    size_t mask = map->capacity - 1;
-    uint32_t hash = hash_key(key);
-    size_t idx = hash & mask;
-
-    while (map->entries[idx].key != 0) {
-        if (map->entries[idx].key == key) {
-            size_t hole = idx;
-            size_t j = probe_next(idx, mask);
-
-            while (map->entries[j].key != 0) {
-                uint32_t h = map->entries[j].hash;
-                size_t home = h & mask;
-
-                bool should_move;
-                if (home <= j) {
-                    should_move = (home <= hole && hole < j);
-                } else {
-                    should_move = (hole < j) || (home <= hole);
-                }
-
-                if (should_move) {
-                    map->entries[hole] = map->entries[j];
-                    hole = j;
-                }
-
-                j = probe_next(j, mask);
-            }
-
-            map->entries[hole].key = 0;
-            map->entries[hole].value = NULL;
-            map->entries[hole].hash = 0;
-
-            map->size--;
-            return true;
-        }
-
-        idx = probe_next(idx, mask);
-    }
-
-    return false;
+bool hash_map_get(const hash_map_t* map, uint64_t key, void** out_value) {
+    return hash_map_impl_get(map, key, out_value);
 }

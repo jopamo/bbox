@@ -204,24 +204,25 @@ static void test_arena_reset_semantics(void) {
 static void test_hash_map_basic(void) {
     hash_map_t map;
     hash_map_init(&map);
+    void* value;
 
-    TEST_ASSERT(hash_map_get(&map, 1) == NULL);
+    TEST_ASSERT(!hash_map_get(&map, 1, &value));
     TEST_ASSERT(hash_map_remove(&map, 1) == false);
 
     hash_map_insert(&map, 1, (void*)0x11);
     hash_map_insert(&map, 2, (void*)0x22);
     hash_map_insert(&map, 100, (void*)0x100);
 
-    TEST_ASSERT(hash_map_get(&map, 1) == (void*)0x11);
-    TEST_ASSERT(hash_map_get(&map, 2) == (void*)0x22);
-    TEST_ASSERT(hash_map_get(&map, 100) == (void*)0x100);
+    TEST_ASSERT(hash_map_get(&map, 1, &value) && value == (void*)0x11);
+    TEST_ASSERT(hash_map_get(&map, 2, &value) && value == (void*)0x22);
+    TEST_ASSERT(hash_map_get(&map, 100, &value) && value == (void*)0x100);
     TEST_ASSERT(hash_map_size(&map) == 3);
 
     TEST_ASSERT(hash_map_remove(&map, 2) == true);
-    TEST_ASSERT(hash_map_get(&map, 2) == NULL);
+    TEST_ASSERT(!hash_map_get(&map, 2, &value));
     TEST_ASSERT(hash_map_size(&map) == 2);
-    TEST_ASSERT(hash_map_get(&map, 1) == (void*)0x11);
-    TEST_ASSERT(hash_map_get(&map, 100) == (void*)0x100);
+    TEST_ASSERT(hash_map_get(&map, 1, &value) && value == (void*)0x11);
+    TEST_ASSERT(hash_map_get(&map, 100, &value) && value == (void*)0x100);
 
     hash_map_destroy(&map);
     printf("test_hash_map_basic passed\n");
@@ -230,23 +231,24 @@ static void test_hash_map_basic(void) {
 static void test_hash_map_update_and_reinsert(void) {
     hash_map_t map;
     hash_map_init(&map);
+    void* value;
 
     hash_map_insert(&map, 7, (void*)0x77);
     TEST_ASSERT(hash_map_size(&map) == 1);
-    TEST_ASSERT(hash_map_get(&map, 7) == (void*)0x77);
+    TEST_ASSERT(hash_map_get(&map, 7, &value) && value == (void*)0x77);
 
     // update existing key should not increase size
     hash_map_insert(&map, 7, (void*)0x99);
     TEST_ASSERT(hash_map_size(&map) == 1);
-    TEST_ASSERT(hash_map_get(&map, 7) == (void*)0x99);
+    TEST_ASSERT(hash_map_get(&map, 7, &value) && value == (void*)0x99);
 
     // remove then reinsert
     TEST_ASSERT(hash_map_remove(&map, 7) == true);
-    TEST_ASSERT(hash_map_get(&map, 7) == NULL);
+    TEST_ASSERT(!hash_map_get(&map, 7, &value));
     TEST_ASSERT(hash_map_size(&map) == 0);
 
     hash_map_insert(&map, 7, (void*)0xAB);
-    TEST_ASSERT(hash_map_get(&map, 7) == (void*)0xAB);
+    TEST_ASSERT(hash_map_get(&map, 7, &value) && value == (void*)0xAB);
     TEST_ASSERT(hash_map_size(&map) == 1);
 
     // remove missing key should be false
@@ -282,7 +284,8 @@ static void test_hash_map_stress_linear_probe_tombstones(void) {
     // odds still readable
     for (uint64_t i = 1; i < n; i += 2) {
         uint64_t k = base + i;
-        TEST_ASSERT(hash_map_get(&map, k) == (void*)(uintptr_t)(k ^ 0xDEADBEEF));
+        void* value;
+        TEST_ASSERT(hash_map_get(&map, k, &value) && value == (void*)(uintptr_t)(k ^ 0xDEADBEEF));
     }
 
     // reinsert evens with new values, should work even with tombstones
@@ -296,7 +299,8 @@ static void test_hash_map_stress_linear_probe_tombstones(void) {
     for (uint64_t i = 0; i < n; i++) {
         uint64_t k = base + i;
         void* want = (void*)(uintptr_t)((i % 2 == 0) ? (k ^ 0xBADC0FFE) : (k ^ 0xDEADBEEF));
-        TEST_ASSERT(hash_map_get(&map, k) == want);
+        void* value;
+        TEST_ASSERT(hash_map_get(&map, k, &value) && value == want);
     }
 
     hash_map_destroy(&map);
@@ -359,7 +363,8 @@ static void test_hash_map_prng_sequence(void) {
             TEST_ASSERT(removed == in_model);
         } else {
             // get
-            void* got = hash_map_get(&map, k);
+            void* got = NULL;
+            hash_map_get(&map, k, &got);
             void* want = NULL;
             for (size_t i = 0; i < used; i++) {
                 if (keys[i] == k) {
@@ -373,7 +378,8 @@ static void test_hash_map_prng_sequence(void) {
 
     // final full verification
     for (uint64_t k = 1; k <= 4096; k++) {
-        void* got = hash_map_get(&map, k);
+        void* got = NULL;
+        hash_map_get(&map, k, &got);
         void* want = NULL;
         for (size_t i = 0; i < used; i++) {
             if (keys[i] == k) {

@@ -122,7 +122,7 @@ static void setup_server(server_t* s) {
     small_vec_init(&s->buckets.pointer_events);
     small_vec_init(&s->buckets.restack_requests);
 
-    hash_map_init(&s->window_to_client);
+    hash_map_u64_init(&s->window_to_client);
 }
 
 static void cleanup_server(server_t* s) {
@@ -132,7 +132,6 @@ static void cleanup_server(server_t* s) {
     small_vec_destroy(&s->buckets.key_presses);
     small_vec_destroy(&s->buckets.button_events);
     small_vec_destroy(&s->buckets.client_messages);
-
     hash_map_destroy(&s->buckets.expose_regions);
     hash_map_destroy(&s->buckets.configure_requests);
     hash_map_destroy(&s->buckets.configure_notifies);
@@ -143,8 +142,7 @@ static void cleanup_server(server_t* s) {
     small_vec_destroy(&s->buckets.pointer_events);
     small_vec_destroy(&s->buckets.restack_requests);
 
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
+    hash_map_u64_destroy(&s->window_to_client);
 
     arena_destroy(&s->tick_arena);
     xcb_disconnect(s->conn);

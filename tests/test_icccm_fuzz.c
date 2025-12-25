@@ -8,6 +8,8 @@
 #include "config.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -39,10 +41,10 @@ static void setup_server(server_t* s) {
     config_init_defaults(&s->config);
 
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
 
@@ -86,8 +88,8 @@ static void cleanup_server(server_t* s) {
 
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
 
     small_vec_destroy(&s->buckets.map_requests);
     small_vec_destroy(&s->buckets.unmap_notifies);
@@ -310,7 +312,7 @@ static void test_map_unmap_property_race(void) {
     list_init(&hot->transients_head);
     arena_init(&cold->string_arena, 128);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, h);
 
     xcb_unmap_notify_event_t* unmap = arena_alloc(&s.tick_arena, sizeof(*unmap));
     memset(unmap, 0, sizeof(*unmap));
@@ -354,7 +356,7 @@ static void test_reparent_notify_self_ignored(void) {
     list_init(&hot->transients_head);
     arena_init(&cold->string_arena, 128);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, h);
 
     assert(xcb_stubs_enqueue_queued_event(make_reparent_event(hot->xid, hot->xid, 1)));
     event_ingest(&s, false);

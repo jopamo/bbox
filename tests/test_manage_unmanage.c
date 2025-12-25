@@ -41,13 +41,13 @@ static void setup_server(server_t* s) {
 
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 64, sizeof(client_hot_t), sizeof(client_cold_t));
-    small_vec_init(&s->active_clients);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    handle_vec_init(&s->active_clients);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     list_init(&s->focus_history);
 
     for (int i = 0; i < LAYER_COUNT; i++) {
-        small_vec_init(&s->layers[i]);
+        handle_vec_init(&s->layers[i]);
     }
 }
 
@@ -68,9 +68,12 @@ static void cleanup_server(server_t* s) {
     }
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    small_vec_destroy(&s->active_clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
+    handle_vec_destroy(&s->active_clients);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) {
+        handle_vec_destroy(&s->layers[i]);
+    }
     xcb_disconnect(s->conn);
 }
 
@@ -174,11 +177,14 @@ static void test_map_request_starts_manage_once(void) {
     stub_poll_for_reply_hook = map_request_poll_for_reply;
     cookie_jar_drain(&s.cookie_jar, s.conn, &s, 8);
     handle_t h = server_get_client_by_window(&s, ev.window);
+    (void)h;
     assert(h != HANDLE_INVALID);
 
     size_t live_before = count_live_clients(&s);
+    (void)live_before;
     wm_handle_map_request(&s, &ev);
     handle_t h2 = server_get_client_by_window(&s, ev.window);
+    (void)h2;
     assert(h2 == h);
     assert(count_live_clients(&s) == live_before);
 
@@ -217,7 +223,7 @@ static void test_finish_manage_maps_client_then_frame(void) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, (uint64_t)h);
 
     stub_mapped_windows_len = 0;
     client_finish_manage(&s, h);
@@ -255,8 +261,8 @@ static void test_unmap_destroy_unmanages(void) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
-    hash_map_insert(&s.frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, (uint64_t)h);
+    hash_map_u64_insert(&s.frame_to_client, hot->frame, (uint64_t)h);
 
     wm_set_focus(&s, h);
     assert(s.focused_client == h);
@@ -287,8 +293,8 @@ static void test_unmap_destroy_unmanages(void) {
     list_init(&hot2->focus_node);
     list_init(&hot2->transients_head);
     list_init(&hot2->transient_sibling);
-    hash_map_insert(&s.window_to_client, hot2->xid, handle_to_ptr(h2));
-    hash_map_insert(&s.frame_to_client, hot2->frame, handle_to_ptr(h2));
+    hash_map_u64_insert(&s.window_to_client, hot2->xid, (uint64_t)h2);
+    hash_map_u64_insert(&s.frame_to_client, hot2->frame, (uint64_t)h2);
 
     xcb_destroy_notify_event_t destroy;
     memset(&destroy, 0, sizeof(destroy));
@@ -327,14 +333,15 @@ static void test_destroy_notify_unmanages_and_destroys_frame(void) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
-    hash_map_insert(&s.frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, (uint64_t)h);
+    hash_map_u64_insert(&s.frame_to_client, hot->frame, (uint64_t)h);
 
     wm_set_focus(&s, h);
     assert(s.focused_client == h);
 
     stub_destroy_window_count = 0;
     xcb_window_t expected_frame = hot->frame;
+    (void)expected_frame;
 
     xcb_destroy_notify_event_t destroy;
     memset(&destroy, 0, sizeof(destroy));
@@ -377,8 +384,8 @@ static void test_iconify_ignores_unmap_notify_send_event(void) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
-    hash_map_insert(&s.frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, (uint64_t)h);
+    hash_map_u64_insert(&s.frame_to_client, hot->frame, (uint64_t)h);
 
     wm_client_iconify(&s, h);
     assert(hot->state == STATE_UNMAPPED);
@@ -433,7 +440,7 @@ static void test_manage_start_already_managed(void) {
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->xid = win;
     hot->state = STATE_MAPPED;  // Assuming managed
-    hash_map_insert(&s.window_to_client, win, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, win, (uint64_t)h);
 
     // Call manage_start again
     // Should return early and not allocate new slot
@@ -456,14 +463,15 @@ static void test_manage_start_slot_full(void) {
 
     // cap=2 => index 0 invalid, index 1 valid. capacity for 1 client.
     slotmap_init(&s.clients, 2, sizeof(client_hot_t), sizeof(client_cold_t));
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
     list_init(&s.focus_history);
     cookie_jar_init(&s.cookie_jar);
 
     // Fill the slot
     void *hot, *cold;
     handle_t h = slotmap_alloc(&s.clients, &hot, &cold);
+    (void)h;
     assert(h != HANDLE_INVALID);
 
     // Now try to manage another window
@@ -478,13 +486,14 @@ static void test_manage_start_slot_full(void) {
 
     cookie_jar_destroy(&s.cookie_jar);
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     xcb_disconnect(s.conn);
 }
 
 static void test_should_focus_on_map_override(void) {
     client_hot_t hot = {0};
+    (void)hot;
 
     hot.focus_override = -1;
     hot.type = WINDOW_TYPE_NORMAL;

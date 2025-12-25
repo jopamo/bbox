@@ -5,6 +5,8 @@
 
 #include "client.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -39,8 +41,8 @@ void test_net_close_window(void) {
     hot->state = STATE_MAPPED;
 
     // Associate window with client in the map
-    hash_map_init(&s.window_to_client);
-    hash_map_insert(&s.window_to_client, hot->xid, (void*)(uintptr_t)h);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_insert(&s.window_to_client, hot->xid, h);
 
     arena_init(&cold->string_arena, 512);
 
@@ -86,7 +88,7 @@ void test_net_close_window(void) {
 
     // Cleanup
     arena_destroy(&cold->string_arena);
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }

@@ -5,6 +5,8 @@
 
 #include "client.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -23,9 +25,9 @@ static void setup_server(server_t* s) {
     s->default_colormap = 555;
 
     list_init(&s->focus_history);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
@@ -40,9 +42,9 @@ static void cleanup_server(server_t* s) {
     }
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     xcb_disconnect(s->conn);
 }
 
@@ -68,8 +70,8 @@ static handle_t add_client(server_t* s, xcb_window_t xid, xcb_window_t frame) {
 
     cold->can_focus = false;
 
-    hash_map_insert(&s->window_to_client, xid, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, xid, h);
+    hash_map_u64_insert(&s->frame_to_client, frame, h);
     return h;
 }
 

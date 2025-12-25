@@ -10,6 +10,8 @@
 #include "config.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -244,9 +246,9 @@ void test_wm_state_manage_unmanage(void) {
     s.conn = (xcb_connection_t*)malloc(1);
     config_init_defaults(&s.config);
     list_init(&s.focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
 
     atoms.WM_STATE = 30;
 
@@ -277,7 +279,7 @@ void test_wm_state_manage_unmanage(void) {
     list_init(&hot->focus_node);
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, h);
 
     client_finish_manage(&s, h);
 
@@ -293,9 +295,9 @@ void test_wm_state_manage_unmanage(void) {
 
     printf("test_wm_state_manage_unmanage passed\n");
     config_destroy(&s.config);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s.layers[i]);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s.layers[i]);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }

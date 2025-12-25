@@ -82,10 +82,10 @@ static bool wm_is_above_in_layer(const server_t* s, const client_hot_t* a, const
     if (!a || !b) return false;
     if (a->layer != b->layer) return false;
 
-    const small_vec_t* v = &s->layers[a->layer];
+    const handle_vec_t* v = &s->layers[a->layer];
     bool seen_b = false;
     for (size_t i = 0; i < v->length; i++) {
-        handle_t h = (handle_t)(uintptr_t)v->items[i];
+        handle_t h = handle_vec_get(v, i);
         const client_hot_t* cur = server_chot((server_t*)s, h);
         if (!cur) continue;
         if (cur == a) return seen_b;
@@ -559,8 +559,9 @@ void wm_handle_destroy_notify(server_t* s, xcb_destroy_notify_event_t* ev) {
     TRACE_LOG("destroy_notify win=%u event=%u", ev->window, ev->event);
 
     // Clean up pending states for unmanaged windows
-    small_vec_t* v = (small_vec_t*)hash_map_get(&s->pending_unmanaged_states, ev->window);
-    if (v) {
+    void* value;
+    if (hash_map_get(&s->pending_unmanaged_states, ev->window, &value)) {
+        small_vec_t* v = (small_vec_t*)value;
         for (size_t i = 0; i < v->length; i++) free(v->items[i]);
         small_vec_destroy(v);
         free(v);
@@ -1485,7 +1486,7 @@ void wm_handle_client_message(server_t* s, xcb_client_message_event_t* ev) {
             if (s->current_desktop >= s->desktop_count) s->current_desktop = 0;
 
             for (size_t i = 0; i < s->active_clients.length; i++) {
-                handle_t h = ptr_to_handle(s->active_clients.items[i]);
+                handle_t h = handle_vec_get(&s->active_clients, i);
                 client_hot_t* hot = server_chot(s, h);
                 if (!hot || hot->sticky) continue;
                 if (hot->desktop >= (int32_t)s->desktop_count) {

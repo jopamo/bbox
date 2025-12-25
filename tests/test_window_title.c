@@ -8,6 +8,8 @@
 #include "client.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "hxm.h"
 #include "wm.h"
 #include "xcb_utils.h"
@@ -21,7 +23,7 @@ static handle_t h;
 // Setup
 static void setup(void) {
     memset(&s, 0, sizeof(s));
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
     cookie_jar_init(&s.cookie_jar);
 
     // Initialize slotmap
@@ -52,7 +54,7 @@ static void teardown(void) {
         arena_destroy(&cold->string_arena);
     }
 
-    small_vec_destroy(&s.active_clients);
+    handle_vec_destroy(&s.active_clients);
     cookie_jar_destroy(&s.cookie_jar);
     slotmap_destroy(&s.clients);
 }

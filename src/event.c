@@ -227,13 +227,13 @@ void server_init(server_t* s) {
     s->buckets.coalesced = 0;
 
     // Initialize global maps
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     hash_map_init(&s->pending_unmanaged_states);
 
     // Layer stacks and focus ring
     for (int i = 0; i < LAYER_COUNT; i++) {
-        small_vec_init(&s->layers[i]);
+        handle_vec_init(&s->layers[i]);
     }
     list_init(&s->focus_history);
     s->focused_client = HANDLE_INVALID;
@@ -246,7 +246,7 @@ void server_init(server_t* s) {
         LOG_ERROR("client slotmap init failed");
         abort();
     }
-    small_vec_init(&s->active_clients);
+    handle_vec_init(&s->active_clients);
 
     // Setup decoration resources (colors/fonts/gcs/etc)
     frame_init_resources(s);
@@ -345,8 +345,8 @@ void server_cleanup(server_t* s) {
     small_vec_destroy(&s->buckets.pointer_events);
     small_vec_destroy(&s->buckets.restack_requests);
 
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
 
     // Clean up pending states
     for (size_t i = 0; i < s->pending_unmanaged_states.capacity; i++) {
@@ -365,10 +365,10 @@ void server_cleanup(server_t* s) {
     hash_map_destroy(&s->pending_unmanaged_states);
 
     slotmap_destroy(&s->clients);
-    small_vec_destroy(&s->active_clients);
+    handle_vec_destroy(&s->active_clients);
 
     for (int i = 0; i < LAYER_COUNT; i++) {
-        small_vec_destroy(&s->layers[i]);
+        handle_vec_destroy(&s->layers[i]);
     }
 
     // Global library cleanup for ASan
@@ -577,7 +577,8 @@ static void bucket_property_notify(server_t* s, xcb_property_notify_event_t* ev)
     }
 
     uint64_t key = prop_key(ev->window, ev->atom);
-    void* prev = hash_map_get(&s->buckets.property_lww, key);
+    void* prev = NULL;
+    hash_map_get(&s->buckets.property_lww, key, &prev);
     if (prev) {
         counters.coalesced_drops[XCB_PROPERTY_NOTIFY]++;
         s->buckets.coalesced++;
@@ -616,7 +617,9 @@ static void bucket_configure_request(server_t* s, xcb_configure_request_event_t*
     uint16_t geom_mask = (uint16_t)(ev->value_mask & ~STACK_BITS);
     if (!geom_mask) return;
 
-    pending_config_t* pc = hash_map_get(&s->buckets.configure_requests, (uint64_t)ev->window);
+    void* pc_ptr = NULL;
+    hash_map_get(&s->buckets.configure_requests, (uint64_t)ev->window, &pc_ptr);
+    pending_config_t* pc = (pending_config_t*)pc_ptr;
     if (!pc) {
         pc = arena_alloc(&s->tick_arena, sizeof(*pc));
         if (!pc) return;
@@ -659,7 +662,9 @@ static void event_ingest_one(server_t* s, xcb_generic_event_t* ev) {
     switch (type) {
         case XCB_EXPOSE: {
             xcb_expose_event_t* e = (xcb_expose_event_t*)ev;
-            dirty_region_t* region = hash_map_get(&s->buckets.expose_regions, e->window);
+            void* region_ptr = NULL;
+            hash_map_get(&s->buckets.expose_regions, e->window, &region_ptr);
+            dirty_region_t* region = (dirty_region_t*)region_ptr;
             if (region) {
                 dirty_region_union_rect(region, e->x, e->y, e->width, e->height);
                 counters.coalesced_drops[type]++;
@@ -760,7 +765,7 @@ static void event_ingest_one(server_t* s, xcb_generic_event_t* ev) {
             xcb_configure_notify_event_t* copy = arena_alloc(&s->tick_arena, sizeof(*e));
             memcpy(copy, e, sizeof(*e));
 
-            if (hash_map_get(&s->buckets.configure_notifies, e->window)) {
+            if (hash_map_get(&s->buckets.configure_notifies, e->window, NULL)) {
                 counters.coalesced_drops[type]++;
                 s->buckets.coalesced++;
                 TRACE_LOG("coalesce configure_notify win=%u", e->window);
@@ -775,7 +780,9 @@ static void event_ingest_one(server_t* s, xcb_generic_event_t* ev) {
 
         case XCB_MOTION_NOTIFY: {
             xcb_motion_notify_event_t* e = (xcb_motion_notify_event_t*)ev;
-            xcb_motion_notify_event_t* existing = hash_map_get(&s->buckets.motion_notifies, e->event);
+            void* existing_ptr = NULL;
+            hash_map_get(&s->buckets.motion_notifies, e->event, &existing_ptr);
+            xcb_motion_notify_event_t* existing = (xcb_motion_notify_event_t*)existing_ptr;
             if (existing) {
                 counters.coalesced_drops[type]++;
                 s->buckets.coalesced++;
@@ -896,14 +903,14 @@ void event_process(server_t* s) {
 
     for (size_t i = 0; i < s->buckets.unmap_notifies.length; i++) {
         xcb_unmap_notify_event_t* ev = s->buckets.unmap_notifies.items[i];
-        if (hash_map_get(&s->buckets.destroyed_windows, ev->window)) continue;
+        if (hash_map_get(&s->buckets.destroyed_windows, ev->window, NULL)) continue;
         TRACE_LOG("process unmap_notify win=%u event=%u", ev->window, ev->event);
         wm_handle_unmap_notify(s, ev);
     }
 
     for (size_t i = 0; i < s->buckets.map_requests.length; i++) {
         xcb_map_request_event_t* ev = s->buckets.map_requests.items[i];
-        if (hash_map_get(&s->buckets.destroyed_windows, ev->window)) continue;
+        if (hash_map_get(&s->buckets.destroyed_windows, ev->window, NULL)) continue;
         TRACE_LOG("process map_request win=%u", ev->window);
         wm_handle_map_request(s, ev);
     }
@@ -938,7 +945,7 @@ void event_process(server_t* s) {
         // Fix 1: Ignore _NET_WORKAREA on root to prevent feedback loop
         if (ev->window == s->root && ev->atom == atoms._NET_WORKAREA) continue;
 
-        if (hash_map_get(&s->buckets.destroyed_windows, ev->window)) continue;
+        if (hash_map_get(&s->buckets.destroyed_windows, ev->window, NULL)) continue;
 
         handle_t h = server_get_client_by_window(s, ev->window);
         if (h != HANDLE_INVALID) {
@@ -955,7 +962,7 @@ void event_process(server_t* s) {
             // Fix 1: Ignore _NET_WORKAREA on root to prevent feedback loop
             if (ev->window == s->root && ev->atom == atoms._NET_WORKAREA) continue;
 
-            if (hash_map_get(&s->buckets.destroyed_windows, ev->window)) continue;
+            if (hash_map_get(&s->buckets.destroyed_windows, ev->window, NULL)) continue;
 
             handle_t h = server_get_client_by_window(s, ev->window);
             if (h != HANDLE_INVALID) {
@@ -1077,7 +1084,7 @@ void event_process(server_t* s) {
 
         if (!s->config.fullscreen_use_workarea) {
             for (size_t i = 0; i < s->active_clients.length; i++) {
-                handle_t h = ptr_to_handle(s->active_clients.items[i]);
+                handle_t h = handle_vec_get(&s->active_clients, i);
                 client_hot_t* hot = server_chot(s, h);
                 if (!hot || hot->layer != LAYER_FULLSCREEN) continue;
                 wm_get_monitor_geometry(s, hot, &hot->desired);
@@ -1117,7 +1124,7 @@ bool event_drain_cookies(server_t* s) {
         bool need_flush = (s->root_dirty != 0);
         if (!need_flush) {
             for (size_t i = 0; i < s->active_clients.length; i++) {
-                handle_t h = ptr_to_handle(s->active_clients.items[i]);
+                handle_t h = handle_vec_get(&s->active_clients, i);
                 client_hot_t* hot = server_chot(s, h);
                 if (hot && hot->dirty != DIRTY_NONE) {
                     need_flush = true;
@@ -1190,7 +1197,7 @@ static void apply_reload(server_t* s) {
         if (s->current_desktop >= s->desktop_count) s->current_desktop = 0;
 
         for (size_t i = 0; i < s->active_clients.length; i++) {
-            handle_t h = ptr_to_handle(s->active_clients.items[i]);
+            handle_t h = handle_vec_get(&s->active_clients, i);
             client_hot_t* hot = server_chot(s, h);
             if (!hot || hot->sticky) continue;
             if (hot->desktop >= (int32_t)s->desktop_count) {
@@ -1214,7 +1221,7 @@ static void apply_reload(server_t* s) {
     wm_setup_keys(s);
 
     for (size_t i = 0; i < s->active_clients.length; i++) {
-        handle_t h = ptr_to_handle(s->active_clients.items[i]);
+        handle_t h = handle_vec_get(&s->active_clients, i);
         client_hot_t* hot = server_chot(s, h);
         if (hot) hot->dirty |= DIRTY_FRAME_STYLE | DIRTY_GEOM;
     }

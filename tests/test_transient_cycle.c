@@ -29,8 +29,8 @@ void test_transient_cycle_prevention(void) {
     hot_a->state = STATE_MAPPED;
     list_init(&hot_a->transients_head);
     list_init(&hot_a->transient_sibling);
-    hash_map_init(&s.window_to_client);
-    hash_map_insert(&s.window_to_client, 10, handle_to_ptr(ha));
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_insert(&s.window_to_client, 10, ha);
 
     // Create Client B
     void *hot_ptr_b = NULL, *cold_ptr_b = NULL;
@@ -42,7 +42,7 @@ void test_transient_cycle_prevention(void) {
     hot_b->state = STATE_MAPPED;
     list_init(&hot_b->transients_head);
     list_init(&hot_b->transient_sibling);
-    hash_map_insert(&s.window_to_client, 20, handle_to_ptr(hb));
+    hash_map_u64_insert(&s.window_to_client, 20, hb);
 
     // 1. Make A transient for B
     // Mock reply for A
@@ -105,7 +105,7 @@ void test_transient_cycle_prevention(void) {
     hot_c->self = hc;
     list_init(&hot_c->transients_head);
     list_init(&hot_c->transient_sibling);
-    hash_map_insert(&s.window_to_client, 30, handle_to_ptr(hc));
+    hash_map_u64_insert(&s.window_to_client, 30, hc);
 
     struct {
         xcb_get_property_reply_t reply;
@@ -134,7 +134,7 @@ void test_transient_cycle_prevention(void) {
     arena_destroy(&cold_a->string_arena);  // Actually empty but for correctness
     arena_destroy(&cold_b->string_arena);
     // ...
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }
@@ -148,18 +148,19 @@ void test_transient_orphan_handled(void) {
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
-    hash_map_init(&s.window_to_client);
+    hash_map_u64_init(&s.window_to_client);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     client_cold_t* cold = (client_cold_t*)cold_ptr;
+    (void)cold;
     hot->xid = 40;
     hot->self = h;
     hot->state = STATE_MAPPED;
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
-    hash_map_insert(&s.window_to_client, 40, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, 40, h);
 
     struct {
         xcb_get_property_reply_t reply;
@@ -185,7 +186,7 @@ void test_transient_orphan_handled(void) {
 
     printf("test_transient_orphan_handled passed\n");
 
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }

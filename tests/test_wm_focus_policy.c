@@ -8,6 +8,8 @@
 #include "client.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -39,9 +41,9 @@ static void setup_server_for_manage(server_t* s) {
     s->focused_client = HANDLE_INVALID;
 
     list_init(&s->focus_history);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 
     s->config.theme.border_width = 1;
     s->config.theme.title_height = 10;
@@ -97,9 +99,9 @@ void test_focus_on_finish_manage(void) {
     s.conn = (xcb_connection_t*)malloc(1);  // Fake connection  // Fake connection
     list_init(&s.focus_history);
     s.focused_client = HANDLE_INVALID;
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -186,8 +188,8 @@ void test_focus_on_finish_manage(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -200,9 +202,9 @@ void test_mru_cycling(void) {
     s.conn = (xcb_connection_t*)malloc(1);  // Fake connection
     list_init(&s.focus_history);
     s.focused_client = HANDLE_INVALID;
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -277,8 +279,8 @@ void test_mru_cycling(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -291,9 +293,9 @@ void test_move_interaction(void) {
     s.conn = (xcb_connection_t*)malloc(1);  // Fake connection
     list_init(&s.focus_history);
     s.focused_client = HANDLE_INVALID;
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
@@ -315,8 +317,8 @@ void test_move_interaction(void) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
-    hash_map_insert(&s.frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, h);
+    hash_map_u64_insert(&s.frame_to_client, hot->frame, h);
 
     // Simulate Alt + Button 1 Press on window
     xcb_button_press_event_t ev = {0};
@@ -356,8 +358,8 @@ void test_move_interaction(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -368,8 +370,8 @@ void test_title_update(void) {
     s.root_depth = 24;
     s.root_visual_type = xcb_get_visualtype(NULL, 0);
     s.conn = (xcb_connection_t*)malloc(1);  // Fake connection
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
@@ -423,8 +425,8 @@ void test_title_update(void) {
     }
     arena_destroy(&cold->string_arena);
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -475,8 +477,8 @@ void test_finish_manage_visibility(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -508,8 +510,8 @@ void test_finish_manage_show_desktop_hides(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -548,8 +550,8 @@ void test_finish_manage_focus_override(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -598,8 +600,8 @@ void test_iconify_updates_focus(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -638,8 +640,8 @@ void test_restore_maps_window(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -672,8 +674,8 @@ void test_set_focus_ignores_unmapped(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -712,8 +714,8 @@ void test_set_focus_revert_policy_and_root_fallback(void) {
     }
     arena_destroy(&s.tick_arena);
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -748,8 +750,8 @@ void test_unmanage_focus_prefers_parent(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -789,8 +791,8 @@ void test_unmanage_focus_falls_back_to_mru(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 

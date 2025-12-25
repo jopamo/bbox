@@ -43,8 +43,10 @@ extern "C" {
 #include "config.h"
 #include "cookie_jar.h"
 #include "ds.h"
+#include "ds_u64.h"
 #include "handle.h"
-#include "handle_conv.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "hxm.h"
 #include "menu.h"
 #include "slotmap.h"
@@ -243,16 +245,16 @@ typedef struct server {
     event_buckets_t buckets;
 
     /* Client storage */
-    slotmap_t clients;          /* owns hot/cold client memory */
-    small_vec_t active_clients; /* handles (handle_t) for iteration */
+    slotmap_t clients;           /* owns hot/cold client memory */
+    handle_vec_t active_clients; /* handles (handle_t) for iteration */
 
     /* Global maps: XID -> handle */
-    hash_map_t window_to_client;         /* xcb_window_t -> handle_t via ptr */
-    hash_map_t frame_to_client;          /* frame XID -> handle_t via ptr */
+    hash_map_u64_t window_to_client;     /* xcb_window_t -> handle_t */
+    hash_map_u64_t frame_to_client;      /* frame XID -> handle_t */
     hash_map_t pending_unmanaged_states; /* xcb_window_t -> small_vec_t* */
 
     /* Stacking layers (bottom -> top) */
-    small_vec_t layers[LAYER_COUNT]; /* each contains handle_t via ptr or direct value depending on ds impl */
+    handle_vec_t layers[LAYER_COUNT]; /* each contains handle_t */
 
     /* Focus */
     handle_t focused_client;
@@ -312,14 +314,16 @@ static inline client_cold_t* server_ccold(server_t* s, handle_t h) {
 
 static inline handle_t server_get_client_by_window(server_t* s, xcb_window_t win) {
     if (!s || win == XCB_NONE) return HANDLE_INVALID;
-    void* ptr = hash_map_get(&s->window_to_client, (uint64_t)win);
-    return ptr_to_handle(ptr);
+    uint64_t v = 0;
+    if (!hash_map_u64_get(&s->window_to_client, (uint64_t)win, &v)) return HANDLE_INVALID;
+    return (handle_t)v;
 }
 
 static inline handle_t server_get_client_by_frame(server_t* s, xcb_window_t frame) {
     if (!s || frame == XCB_NONE) return HANDLE_INVALID;
-    void* ptr = hash_map_get(&s->frame_to_client, (uint64_t)frame);
-    return ptr_to_handle(ptr);
+    uint64_t v = 0;
+    if (!hash_map_u64_get(&s->frame_to_client, (uint64_t)frame, &v)) return HANDLE_INVALID;
+    return (handle_t)v;
 }
 
 /* ---------- Server lifecycle ---------- */

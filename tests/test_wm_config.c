@@ -15,7 +15,7 @@ void test_configure_request_managed(void) {
         fprintf(stderr, "Failed to init slotmap\n");
         return;
     }
-    hash_map_init(&s.window_to_client);
+    hash_map_u64_init(&s.window_to_client);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
@@ -28,7 +28,7 @@ void test_configure_request_managed(void) {
     hot->hints.max_w = 200;
     hot->hints.max_h = 200;
 
-    hash_map_insert(&s.window_to_client, 123, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, 123, (uint64_t)h);
 
     pending_config_t ev;
     memset(&ev, 0, sizeof(ev));
@@ -50,7 +50,7 @@ void test_configure_request_managed(void) {
     printf("test_configure_request_managed passed\n");
 
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
 }
 
 int main(void) {

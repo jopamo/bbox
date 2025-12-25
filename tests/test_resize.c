@@ -8,6 +8,8 @@
 #include "ds.h"
 #include "event.h"
 #include "handle_conv.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 
 // Stub required globals
@@ -28,7 +30,7 @@ void test_resize_logic(void) {
     // Init list heads
     list_init(&s.focus_history);
     for (int i = 0; i < LAYER_COUNT; i++) {
-        small_vec_init(&s.layers[i]);
+        handle_vec_init(&s.layers[i]);
     }
 
     // Init slotmap
@@ -75,8 +77,8 @@ void test_resize_logic(void) {
     stack_raise(&s, h);
 
     // Init frame map
-    hash_map_init(&s.frame_to_client);
-    hash_map_insert(&s.frame_to_client, 999, handle_to_ptr(h));
+    hash_map_u64_init(&s.frame_to_client);
+    hash_map_u64_insert(&s.frame_to_client, 999, h);
 
     // ==========================================
     // Test 0: Hit testing via wm_handle_button_press
@@ -222,7 +224,7 @@ void test_resize_logic(void) {
             }
         }
     }
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     slotmap_destroy(&s.clients);
     free(s.conn);
 }

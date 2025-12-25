@@ -20,7 +20,7 @@ void test_property_dirty_bits(void) {
         fprintf(stderr, "Failed to init slotmap\n");
         return;
     }
-    hash_map_init(&s.window_to_client);
+    hash_map_u64_init(&s.window_to_client);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
@@ -28,7 +28,7 @@ void test_property_dirty_bits(void) {
     hot->xid = 123;
     hot->dirty = DIRTY_NONE;
 
-    hash_map_insert(&s.window_to_client, 123, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, 123, (uint64_t)h);
 
     xcb_property_notify_event_t ev;
     memset(&ev, 0, sizeof(ev));
@@ -48,7 +48,7 @@ void test_property_dirty_bits(void) {
     printf("test_property_dirty_bits passed\n");
 
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
 }
 
 int main(void) {

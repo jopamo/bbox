@@ -45,6 +45,7 @@ void test_dirty_region_invalid_inputs(void) {
     assert(r.h == 5);
 
     dirty_region_t zero = dirty_region_make(0, 0, 0, 10);
+    (void)zero;
     assert(!zero.valid);
 
     dirty_region_clamp(&r, 40, 40, 10, 10);

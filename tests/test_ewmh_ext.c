@@ -5,6 +5,8 @@
 
 #include "client.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -33,7 +35,7 @@ void test_frame_extents(void) {
     atoms._NET_FRAME_EXTENTS = 200;
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
 
     // Manually setup a client to simulate what client_finish_manage does,
     // but calling wm_flush_dirty is hard because it relies on the loop and hash maps.
@@ -41,14 +43,14 @@ void test_frame_extents(void) {
     // Actually, I modified client_finish_manage to call xcb_change_property.
     // So I can just call client_finish_manage if I setup enough context (hash maps).
 
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
     list_init(&s.focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
-    small_vec_push(&s.active_clients, handle_to_ptr(h));
+    handle_vec_push(&s.active_clients, h);
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->self = h;
     hot->xid = 123;
@@ -118,9 +120,9 @@ void test_frame_extents(void) {
     render_free(&hot->render_ctx);
     if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
     slotmap_destroy(&s.clients);
-    small_vec_destroy(&s.active_clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    handle_vec_destroy(&s.active_clients);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     config_destroy(&s.config);
     arena_destroy(&s.tick_arena);
     free(s.conn);
@@ -141,14 +143,14 @@ void test_allowed_actions(void) {
     atoms._NET_WM_STATE = 400;
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
 
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
-    small_vec_push(&s.active_clients, handle_to_ptr(h));
+    handle_vec_push(&s.active_clients, h);
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->self = h;
     hot->xid = 123;
@@ -208,9 +210,9 @@ void test_allowed_actions(void) {
     render_free(&hot->render_ctx);
     if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
     slotmap_destroy(&s.clients);
-    small_vec_destroy(&s.active_clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    handle_vec_destroy(&s.active_clients);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     arena_destroy(&s.tick_arena);
     free(s.conn);
 }
@@ -230,12 +232,12 @@ void test_desktop_clamp_single(void) {
     atoms.WM_STATE = 501;
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
     list_init(&s.focus_history);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
-    small_vec_push(&s.active_clients, handle_to_ptr(h));
+    handle_vec_push(&s.active_clients, h);
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->self = h;
     hot->xid = 123;
@@ -245,9 +247,9 @@ void test_desktop_clamp_single(void) {
     hot->sticky = false;
     list_init(&hot->focus_node);
 
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     stub_last_prop_atom = 0;
     wm_client_move_to_workspace(&s, h, 2, false);
@@ -281,13 +283,13 @@ void test_desktop_clamp_single(void) {
 
     printf("test_desktop_clamp_single passed\n");
 
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s.layers[i]);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s.layers[i]);
     render_free(&hot->render_ctx);
     if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
     slotmap_destroy(&s.clients);
-    small_vec_destroy(&s.active_clients);
+    handle_vec_destroy(&s.active_clients);
     arena_destroy(&s.tick_arena);
     free(s.conn);
 }
@@ -302,14 +304,14 @@ void test_dirty_stack_relayer(void) {
     s.root = 1;
     arena_init(&s.tick_arena, 4096);
 
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    small_vec_init(&s.active_clients);
+    handle_vec_init(&s.active_clients);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
-    small_vec_push(&s.active_clients, handle_to_ptr(h));
+    handle_vec_push(&s.active_clients, h);
     client_hot_t* hot = (client_hot_t*)hot_ptr;
     hot->self = h;
     hot->xid = 123;
@@ -328,9 +330,9 @@ void test_dirty_stack_relayer(void) {
 
     wm_flush_dirty(&s, monotonic_time_ns());
 
-    assert(s.layers[LAYER_NORMAL].length == 0);
-    assert(s.layers[LAYER_ABOVE].length == 1);
-    assert((handle_t)(uintptr_t)s.layers[LAYER_ABOVE].items[0] == h);
+    assert(handle_vec_len(&s.layers[LAYER_NORMAL]) == 0);
+    assert(handle_vec_len(&s.layers[LAYER_ABOVE]) == 1);
+    assert(handle_vec_get(&s.layers[LAYER_ABOVE], 0) == h);
 
     printf("test_dirty_stack_relayer passed\n");
 

@@ -5,6 +5,8 @@
 #include "client.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 
 void test_adoption_logic(void) {
@@ -12,7 +14,7 @@ void test_adoption_logic(void) {
     memset(&s, 0, sizeof(s));
     s.conn = (xcb_connection_t*)0xDEADBEEF;  // Just not NULL
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    hash_map_init(&s.window_to_client);
+    hash_map_u64_init(&s.window_to_client);
 
     // Mock reply for adoption check
     xcb_get_window_attributes_reply_t mock_attr;
@@ -40,7 +42,7 @@ void test_adoption_logic(void) {
     printf("test_adoption_logic passed\n");
 
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
 }
 
 int main(void) {

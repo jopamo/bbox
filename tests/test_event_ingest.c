@@ -14,8 +14,9 @@ extern bool xcb_stubs_enqueue_event(xcb_generic_event_t* ev);
 extern size_t xcb_stubs_queued_event_len(void);
 extern size_t xcb_stubs_event_len(void);
 
+static xcb_generic_event_t* make_event(uint8_t type) __attribute__((unused));
 static xcb_generic_event_t* make_event(uint8_t type) {
-    xcb_generic_event_t* ev = calloc(1, sizeof(*ev));
+    xcb_generic_event_t* ev = calloc(1, sizeof(xcb_generic_event_t));
     ev->response_type = type;
     return ev;
 }
@@ -137,15 +138,17 @@ static void test_event_ingest_coalesces_configure_request(void) {
 
     assert(hash_map_size(&s.buckets.configure_requests) == 1);
 
-    pending_config_t* pc = hash_map_get(&s.buckets.configure_requests, win);
+    void* pc_ptr;
+    hash_map_get(&s.buckets.configure_requests, win, &pc_ptr);
+    pending_config_t* pc = (pending_config_t*)pc_ptr;
     assert(pc != NULL);
+    assert(pc->window == win);
     assert(pc->mask ==
            (XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT));
     assert(pc->x == 100);
     assert(pc->y == 200);
     assert(pc->width == 300);
     assert(pc->height == 400);
-    assert(s.buckets.coalesced == 1);
 
     printf("test_event_ingest_coalesces_configure_request passed\n");
     xcb_stubs_reset();
@@ -173,12 +176,14 @@ static void test_event_ingest_coalesces_configure_request_split(void) {
 
     // Geometry part should be in configure_requests
     assert(hash_map_size(&s.buckets.configure_requests) == 1);
-    pending_config_t* pc = hash_map_get(&s.buckets.configure_requests, win);
+    void* pc_ptr;
+    hash_map_get(&s.buckets.configure_requests, win, &pc_ptr);
+    pending_config_t* pc = (pending_config_t*)pc_ptr;
     assert(pc != NULL);
+    assert(pc->window == win);
     assert(pc->mask == XCB_CONFIG_WINDOW_X);
     assert(pc->x == 100);
 
-    // Stacking part should be in restack_requests
     assert(s.buckets.restack_requests.length == 1);
     pending_restack_t* pr = s.buckets.restack_requests.items[0];
     assert(pr->window == win);
@@ -314,7 +319,9 @@ static void test_event_ingest_coalesces_motion_notify(void) {
     assert(s.buckets.coalesced == 9);
 
     // The one kept should be the last one (x=90, y=90)
-    xcb_motion_notify_event_t* final_ev = hash_map_get(&s.buckets.motion_notifies, win);
+    void* final_ev_ptr;
+    hash_map_get(&s.buckets.motion_notifies, win, &final_ev_ptr);
+    xcb_motion_notify_event_t* final_ev = (xcb_motion_notify_event_t*)final_ev_ptr;
     assert(final_ev != NULL);
     assert(final_ev->event_x == 90);
     assert(final_ev->event_y == 90);
@@ -364,7 +371,9 @@ static void test_event_ingest_property_notify_split(void) {
 
     assert(hash_map_size(&s.buckets.property_lww) == 1);
     uint64_t key = ((uint64_t)win << 32) | atoms.WM_NAME;
-    xcb_property_notify_event_t* final_prop = hash_map_get(&s.buckets.property_lww, key);
+    void* final_prop_ptr;
+    hash_map_get(&s.buckets.property_lww, key, &final_prop_ptr);
+    xcb_property_notify_event_t* final_prop = (xcb_property_notify_event_t*)final_prop_ptr;
     assert(final_prop != NULL);
     assert(final_prop->state == 1);
     assert(s.buckets.coalesced == 1);

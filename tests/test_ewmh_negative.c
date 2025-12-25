@@ -69,10 +69,10 @@ static void setup_server(server_t* s) {
     arena_init(&s->tick_arena, 4096);
     cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 32, sizeof(client_hot_t), sizeof(client_cold_t));
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 }
 
 static void cleanup_server(server_t* s) {
@@ -89,9 +89,9 @@ static void cleanup_server(server_t* s) {
     }
     cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     arena_destroy(&s->tick_arena);
     config_destroy(&s->config);
     xcb_disconnect(s->conn);
@@ -125,8 +125,8 @@ static handle_t add_mapped_client(server_t* s, xcb_window_t win, xcb_window_t fr
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s->window_to_client, win, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, win, (uint64_t)h);
+    hash_map_u64_insert(&s->frame_to_client, frame, (uint64_t)h);
     return h;
 }
 

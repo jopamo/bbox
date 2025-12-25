@@ -383,7 +383,7 @@ static void test_property_deletions_reset_defaults(void) {
     atoms.WM_NAME = 14;
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
-    hash_map_init(&s.window_to_client);
+    hash_map_u64_init(&s.window_to_client);
 
     void *hot_ptr = NULL, *cold_ptr = NULL;
     handle_t h = slotmap_alloc(&s.clients, &hot_ptr, &cold_ptr);
@@ -398,7 +398,7 @@ static void test_property_deletions_reset_defaults(void) {
     hot->state = STATE_MAPPED;
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
-    hash_map_insert(&s.window_to_client, hot->xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s.window_to_client, hot->xid, (uint64_t)h);
 
     cookie_slot_t slot = {0};
     slot.type = COOKIE_GET_PROPERTY;
@@ -483,7 +483,7 @@ static void test_property_deletions_reset_defaults(void) {
     assert(strcmp(cold->base_title, "") == 0);
 
     printf("test_property_deletions_reset_defaults passed\n");
-    hash_map_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
     cleanup_server(&s);
 }
 

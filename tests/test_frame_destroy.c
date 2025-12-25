@@ -59,7 +59,7 @@ static void server_init_for_test(server_t* s) {
     // Init list heads
     list_init(&s->focus_history);
     for (int i = 0; i < LAYER_COUNT; i++) {
-        small_vec_init(&s->layers[i]);
+        handle_vec_init(&s->layers[i]);
     }
 
     // Init slotmap
@@ -69,8 +69,8 @@ static void server_init_for_test(server_t* s) {
     }
 
     // Init lookups
-    hash_map_init(&s->frame_to_client);
-    hash_map_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
 }
 
 static void server_destroy_for_test(server_t* s) {
@@ -84,8 +84,8 @@ static void server_destroy_for_test(server_t* s) {
             }
         }
     }
-    hash_map_destroy(&s->frame_to_client);
-    hash_map_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    hash_map_u64_destroy(&s->window_to_client);
     slotmap_destroy(&s->clients);
     free(s->conn);
 }
@@ -116,10 +116,10 @@ static handle_t test_create_managed_client(server_t* s, xcb_window_t client_xid,
     list_init(&hot->focus_node);
 
     // Register maps
-    hash_map_insert(&s->window_to_client, client_xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, client_xid, h);
     // If your window_to_client also tracks frames (some WMs do, some don't, usually frame_to_client is separate)
     // Based on test_resize.c, there is s->frame_to_client.
-    hash_map_insert(&s->frame_to_client, frame_xid, handle_to_ptr(h));
+    hash_map_u64_insert(&s->frame_to_client, frame_xid, h);
 
     // Also usually we want the client in a layer
     hot->layer = LAYER_NORMAL;

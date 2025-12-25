@@ -134,8 +134,8 @@ void hash_map_destroy(hash_map_t* map);
  */
 bool hash_map_insert(hash_map_t* map, uint64_t key, void* value);
 
-/* Get value for key or NULL */
-void* hash_map_get(const hash_map_t* map, uint64_t key);
+/* Get value for key, returns true on success */
+bool hash_map_get(const hash_map_t* map, uint64_t key, void** out_value);
 
 /* Remove key if present (returns true if removed) */
 bool hash_map_remove(hash_map_t* map, uint64_t key);

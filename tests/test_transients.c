@@ -7,6 +7,8 @@
 #include "client.h"
 #include "cookie_jar.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -22,9 +24,9 @@ void test_transient_stacking(void) {
     s.root_depth = 24;
     s.root_visual_type = xcb_get_visualtype(NULL, 0);
     s.conn = (xcb_connection_t*)malloc(1);
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s.layers[i]);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s.layers[i]);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -61,18 +63,17 @@ void test_transient_stacking(void) {
     stack_place_above(&s, ht, hp);
 
     // Verify order: P then T
-    assert(s.layers[LAYER_NORMAL].length == 2);
-    assert((handle_t)(uintptr_t)s.layers[LAYER_NORMAL].items[0] == hp);
-    assert((handle_t)(uintptr_t)s.layers[LAYER_NORMAL].items[1] == ht);
+    assert(handle_vec_len(&s.layers[LAYER_NORMAL]) == 2);
+    assert(handle_vec_get(&s.layers[LAYER_NORMAL], 0) == hp);
+    assert(handle_vec_get(&s.layers[LAYER_NORMAL], 1) == ht);
 
     // Raise parent, should raise transient too
     stack_raise(&s, hp);
     // After raise, T should still be above P, and both at the end of the layer list
-    assert(s.layers[LAYER_NORMAL].length == 2);
-    assert((handle_t)(uintptr_t)s.layers[LAYER_NORMAL].items[0] == hp);
-    assert((handle_t)(uintptr_t)s.layers[LAYER_NORMAL].items[1] == ht);
+    assert(handle_vec_len(&s.layers[LAYER_NORMAL]) == 2);
+    assert(handle_vec_get(&s.layers[LAYER_NORMAL], 0) == hp);
+    assert(handle_vec_get(&s.layers[LAYER_NORMAL], 1) == ht);
 
-    printf("test_transient_stacking passed\n");
     printf("test_transient_stacking passed\n");
     for (uint32_t i = 1; i < s.clients.cap; i++) {
         if (s.clients.hdr[i].live) {
@@ -85,6 +86,8 @@ void test_transient_stacking(void) {
         }
     }
     slotmap_destroy(&s.clients);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -96,8 +99,8 @@ void test_transient_focus_return(void) {
     s.root_visual_type = xcb_get_visualtype(NULL, 0);
     s.conn = (xcb_connection_t*)malloc(1);
     list_init(&s.focus_history);
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -137,7 +140,6 @@ void test_transient_focus_return(void) {
     assert(s.focused_client == hp);
 
     printf("test_transient_focus_return passed\n");
-    printf("test_transient_stacking passed\n");
     for (uint32_t i = 1; i < s.clients.cap; i++) {
         if (s.clients.hdr[i].live) {
             handle_t h = handle_make(i, s.clients.hdr[i].gen);
@@ -149,6 +151,8 @@ void test_transient_focus_return(void) {
         }
     }
     slotmap_destroy(&s.clients);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -159,8 +163,8 @@ void test_transient_parent_unmanage_unlinks_child(void) {
     s.root_depth = 24;
     s.root_visual_type = xcb_get_visualtype(NULL, 0);
     s.conn = (xcb_connection_t*)malloc(1);
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
 
@@ -186,10 +190,10 @@ void test_transient_parent_unmanage_unlinks_child(void) {
     list_init(&ht_hot->transient_sibling);
     list_insert(&ht_hot->transient_sibling, hp_hot->transients_head.prev, &hp_hot->transients_head);
 
-    hash_map_insert(&s.window_to_client, hp_hot->xid, handle_to_ptr(hp));
-    hash_map_insert(&s.frame_to_client, hp_hot->frame, handle_to_ptr(hp));
-    hash_map_insert(&s.window_to_client, ht_hot->xid, handle_to_ptr(ht));
-    hash_map_insert(&s.frame_to_client, ht_hot->frame, handle_to_ptr(ht));
+    hash_map_u64_insert(&s.window_to_client, hp_hot->xid, hp);
+    hash_map_u64_insert(&s.frame_to_client, hp_hot->frame, hp);
+    hash_map_u64_insert(&s.window_to_client, ht_hot->xid, ht);
+    hash_map_u64_insert(&s.frame_to_client, ht_hot->frame, ht);
 
     client_unmanage(&s, hp);
 
@@ -210,8 +214,8 @@ void test_transient_parent_unmanage_unlinks_child(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 
@@ -222,8 +226,8 @@ void test_transient_unmanage_unlinks_from_parent(void) {
     s.root_depth = 24;
     s.root_visual_type = xcb_get_visualtype(NULL, 0);
     s.conn = (xcb_connection_t*)malloc(1);
-    hash_map_init(&s.window_to_client);
-    hash_map_init(&s.frame_to_client);
+    hash_map_u64_init(&s.window_to_client);
+    hash_map_u64_init(&s.frame_to_client);
     list_init(&s.focus_history);
 
     if (!slotmap_init(&s.clients, 16, sizeof(client_hot_t), sizeof(client_cold_t))) return;
@@ -252,10 +256,10 @@ void test_transient_unmanage_unlinks_from_parent(void) {
     list_init(&ht_hot->transient_sibling);
     list_insert(&ht_hot->transient_sibling, hp_hot->transients_head.prev, &hp_hot->transients_head);
 
-    hash_map_insert(&s.window_to_client, hp_hot->xid, handle_to_ptr(hp));
-    hash_map_insert(&s.frame_to_client, hp_hot->frame, handle_to_ptr(hp));
-    hash_map_insert(&s.window_to_client, ht_hot->xid, handle_to_ptr(ht));
-    hash_map_insert(&s.frame_to_client, ht_hot->frame, handle_to_ptr(ht));
+    hash_map_u64_insert(&s.window_to_client, hp_hot->xid, hp);
+    hash_map_u64_insert(&s.frame_to_client, hp_hot->frame, hp);
+    hash_map_u64_insert(&s.window_to_client, ht_hot->xid, ht);
+    hash_map_u64_insert(&s.frame_to_client, ht_hot->frame, ht);
 
     wm_set_focus(&s, hp);
     wm_set_focus(&s, ht);
@@ -281,8 +285,8 @@ void test_transient_unmanage_unlinks_from_parent(void) {
         }
     }
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     free(s.conn);
 }
 

@@ -50,13 +50,13 @@ static void setup_server(server_t* s) {
     s->config.theme.border_width = 2;
     s->config.theme.title_height = 10;
 
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
 
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
-    small_vec_init(&s->active_clients);
+    handle_vec_init(&s->active_clients);
     arena_init(&s->tick_arena, 4096);
 }
 
@@ -73,10 +73,10 @@ static void cleanup_server(server_t* s) {
         }
     }
     slotmap_destroy(&s->clients);
-    small_vec_destroy(&s->active_clients);
-    hash_map_destroy(&s->window_to_client);
-    hash_map_destroy(&s->frame_to_client);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_destroy(&s->layers[i]);
+    handle_vec_destroy(&s->active_clients);
+    hash_map_u64_destroy(&s->window_to_client);
+    hash_map_u64_destroy(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_destroy(&s->layers[i]);
     arena_destroy(&s->tick_arena);
     config_destroy(&s->config);
     xcb_disconnect(s->conn);
@@ -108,9 +108,9 @@ static handle_t add_client(server_t* s, xcb_window_t win, xcb_window_t frame) {
     list_init(&hot->transients_head);
     list_init(&hot->transient_sibling);
 
-    hash_map_insert(&s->window_to_client, win, handle_to_ptr(h));
-    hash_map_insert(&s->frame_to_client, frame, handle_to_ptr(h));
-    small_vec_push(&s->active_clients, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, win, (uint64_t)h);
+    hash_map_u64_insert(&s->frame_to_client, frame, (uint64_t)h);
+    handle_vec_push(&s->active_clients, h);
 
     return h;
 }

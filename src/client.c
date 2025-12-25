@@ -216,8 +216,8 @@ void client_manage_start(server_t* s, xcb_window_t win) {
     TRACE_LOG("manage_start init nodes h=%lx focus_node=%p", h, (void*)&hot->focus_node);
 
     // Register mapping so we can find it
-    hash_map_insert(&s->window_to_client, win, handle_to_ptr(h));
-    small_vec_push(&s->active_clients, handle_to_ptr(h));
+    hash_map_u64_insert(&s->window_to_client, win, (uint64_t)h);
+    handle_vec_push(&s->active_clients, h);
     TRACE_LOG("manage_start window_to_client[%u]=%lx", win, h);
 
     uint32_t early_events = XCB_EVENT_MASK_PROPERTY_CHANGE;
@@ -473,7 +473,7 @@ void client_finish_manage(server_t* s, handle_t h) {
                       XCB_WINDOW_CLASS_INPUT_OUTPUT, s->root_visual, mask, values);
 
     // Register frame mapping
-    hash_map_insert(&s->frame_to_client, hot->frame, handle_to_ptr(h));
+    hash_map_u64_insert(&s->frame_to_client, hot->frame, (uint64_t)h);
 
     // 2. Add to SaveSet (crash safety)
     xcb_change_save_set(s->conn, XCB_SET_MODE_INSERT, hot->xid);
@@ -686,7 +686,9 @@ void client_finish_manage(server_t* s, handle_t h) {
     hot->manage_phase = MANAGE_DONE;
 
     // Replay stashed states from before management
-    small_vec_t* stashed = (small_vec_t*)hash_map_get(&s->pending_unmanaged_states, hot->xid);
+    void* stashed_ptr = NULL;
+    hash_map_get(&s->pending_unmanaged_states, hot->xid, &stashed_ptr);
+    small_vec_t* stashed = (small_vec_t*)stashed_ptr;
     if (stashed) {
         LOG_INFO("Replaying %zu stashed _NET_WM_STATE messages for client %lx", stashed->length, h);
         for (size_t i = 0; i < stashed->length; i++) {
@@ -735,7 +737,7 @@ void client_destroy_resources(server_t* s, handle_t h) {
     // 3. Destroy Frame Window
     if (hot->frame != XCB_NONE) {
         // Remove from lookup map first
-        hash_map_remove(&s->frame_to_client, hot->frame);
+        hash_map_u64_remove(&s->frame_to_client, hot->frame);
 
         TRACE_LOG("destroy_resources destroy frame=%u", hot->frame);
         xcb_destroy_window(s->conn, hot->frame);
@@ -752,7 +754,7 @@ void client_destroy_resources(server_t* s, handle_t h) {
     // 5. Cleanup Client Window Map
     // We stop tracking the client window xid.
     if (hot->xid != XCB_NONE) {
-        hash_map_remove(&s->window_to_client, hot->xid);
+        hash_map_u64_remove(&s->window_to_client, hot->xid);
         // Note: we do NOT destroy hot->xid, that belongs to the client application.
     }
 
@@ -940,7 +942,12 @@ void client_unmanage(server_t* s, handle_t h) {
 
     // Free slot
     slotmap_free(&s->clients, h);
-    small_vec_remove_swap(&s->active_clients, handle_to_ptr(h));
+    for (size_t i = 0; i < s->active_clients.length; i++) {
+        if (handle_vec_get(&s->active_clients, i) == h) {
+            s->active_clients.items[i] = s->active_clients.items[--s->active_clients.length];
+            break;
+        }
+    }
 
     s->root_dirty |= ROOT_DIRTY_CLIENT_LIST;
     s->workarea_dirty = true;

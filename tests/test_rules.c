@@ -6,6 +6,8 @@
 #include "client.h"
 #include "config.h"
 #include "event.h"
+#include "handle_vec.h"
+#include "hash_map_u64.h"
 #include "wm.h"
 #include "xcb_utils.h"
 
@@ -20,9 +22,9 @@ void setup_server(server_t* s) {
     s->desktop_count = 4;
     s->current_desktop = 0;
     list_init(&s->focus_history);
-    for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
-    hash_map_init(&s->window_to_client);
-    hash_map_init(&s->frame_to_client);
+    for (int i = 0; i < LAYER_COUNT; i++) handle_vec_init(&s->layers[i]);
+    hash_map_u64_init(&s->window_to_client);
+    hash_map_u64_init(&s->frame_to_client);
     config_init_defaults(&s->config);
 
     s->workarea.x = 0;
@@ -98,8 +100,8 @@ void test_rules_matching(void) {
     client_unmanage(&s, h);
     config_destroy(&s.config);
     slotmap_destroy(&s.clients);
-    hash_map_destroy(&s.window_to_client);
-    hash_map_destroy(&s.frame_to_client);
+    hash_map_u64_destroy(&s.window_to_client);
+    hash_map_u64_destroy(&s.frame_to_client);
     xcb_key_symbols_free(s.keysyms);
     xcb_disconnect(s.conn);
 }
