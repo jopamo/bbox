@@ -133,6 +133,7 @@ static void test_active_window_updates(void) {
 
     handle_t h = add_mapped_client(&s, 1001, 1101);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     wm_set_focus(&s, h);
     wm_flush_dirty(&s, monotonic_time_ns());
@@ -141,12 +142,14 @@ static void test_active_window_updates(void) {
     assert(call != NULL);
     assert(call->len == 1);
     const uint32_t* val = (const uint32_t*)call->data;
+    (void)val;
     assert(val[0] == hot->xid);
 
     wm_set_focus(&s, HANDLE_INVALID);
     wm_flush_dirty(&s, monotonic_time_ns());
 
     const struct stub_prop_call* del = find_prop_call(s.root, atoms._NET_ACTIVE_WINDOW, true);
+    (void)del;
     assert(del != NULL);
 
     printf("test_active_window_updates passed\n");
@@ -173,6 +176,7 @@ static void test_client_list_add_remove(void) {
     assert(list != NULL);
     assert(list->len == 2);
     const uint32_t* list_vals = (const uint32_t*)list->data;
+    (void)list_vals;
     assert(list_vals[0] == 2001);
     assert(list_vals[1] == 2002);
 
@@ -183,6 +187,7 @@ static void test_client_list_add_remove(void) {
     assert(list2 != NULL);
     assert(list2->len == 1);
     list_vals = (const uint32_t*)list2->data;
+    (void)list_vals;
     assert(list_vals[0] == 2002);
 
     printf("test_client_list_add_remove passed\n");
@@ -224,6 +229,7 @@ static void test_client_list_filters_skip_and_dock(void) {
     assert(list != NULL);
     assert(list->len == 4);
     const uint32_t* list_vals = (const uint32_t*)list->data;
+    (void)list_vals;
     assert(list_vals[0] == 7001);
     assert(list_vals[1] == 7002);
     assert(list_vals[2] == 7003);
@@ -233,6 +239,7 @@ static void test_client_list_filters_skip_and_dock(void) {
     assert(list_stack != NULL);
     assert(list_stack->len == 4);
     const uint32_t* stack_vals = (const uint32_t*)list_stack->data;
+    (void)stack_vals;
     assert(stack_vals[0] == 7001);
     assert(stack_vals[1] == 7002);
     assert(stack_vals[2] == 7003);
@@ -258,11 +265,13 @@ static void test_desktop_props_publish_and_switch(void) {
     const struct stub_prop_call* num = find_prop_call(s.root, atoms._NET_NUMBER_OF_DESKTOPS, false);
     assert(num != NULL);
     const uint32_t* num_vals = (const uint32_t*)num->data;
+    (void)num_vals;
     assert(num_vals[0] == 3);
 
     const struct stub_prop_call* cur = find_prop_call(s.root, atoms._NET_CURRENT_DESKTOP, false);
     assert(cur != NULL);
     const uint32_t* cur_vals = (const uint32_t*)cur->data;
+    (void)cur_vals;
     assert(cur_vals[0] == 1);
 
     wm_switch_workspace(&s, 2);
@@ -271,6 +280,7 @@ static void test_desktop_props_publish_and_switch(void) {
     const struct stub_prop_call* cur2 = find_prop_call(s.root, atoms._NET_CURRENT_DESKTOP, false);
     assert(cur2 != NULL);
     cur_vals = (const uint32_t*)cur2->data;
+    (void)cur_vals;
     assert(cur_vals[0] == 2);
 
     printf("test_desktop_props_publish_and_switch passed\n");
@@ -288,6 +298,7 @@ static void test_strut_updates_workarea(void) {
 
     handle_t h = add_mapped_client(&s, 3001, 3101);
     client_cold_t* cold = server_ccold(&s, h);
+    (void)cold;
     assert(cold != NULL);
 
     cookie_slot_t slot = {0};
@@ -313,6 +324,7 @@ static void test_strut_updates_workarea(void) {
     const struct stub_prop_call* wa = find_prop_call(s.root, atoms._NET_WORKAREA, false);
     assert(wa != NULL);
     const uint32_t* vals = (const uint32_t*)wa->data;
+    (void)vals;
     assert(vals[0] == 100);
     assert(vals[1] == 0);
     assert(vals[2] == 1820);
@@ -326,6 +338,7 @@ static void test_strut_updates_workarea(void) {
     const struct stub_prop_call* wa2 = find_prop_call(s.root, atoms._NET_WORKAREA, false);
     assert(wa2 != NULL);
     vals = (const uint32_t*)wa2->data;
+    (void)vals;
     assert(vals[0] == 0);
     assert(vals[1] == 0);
     assert(vals[2] == 1920);
@@ -418,6 +431,7 @@ static void test_urgency_hint_maps_to_ewmh_state(void) {
 
     handle_t h = add_mapped_client(&s, 6001, 6101);
     client_hot_t* hot = server_chot(&s, h);
+    (void)hot;
 
     cookie_slot_t slot = {0};
     slot.client = h;
@@ -438,6 +452,7 @@ static void test_urgency_hint_maps_to_ewmh_state(void) {
     wm_flush_dirty(&s, monotonic_time_ns());
 
     const struct stub_prop_call* state = find_prop_call(hot->xid, atoms._NET_WM_STATE, false);
+    (void)state;
     assert(state != NULL);
     assert(atom_in_state_list((xcb_atom_t*)state->data, state->len, atoms._NET_WM_STATE_DEMANDS_ATTENTION));
 
@@ -447,6 +462,7 @@ static void test_urgency_hint_maps_to_ewmh_state(void) {
     wm_flush_dirty(&s, monotonic_time_ns());
 
     state = find_prop_call(hot->xid, atoms._NET_WM_STATE, false);
+    (void)state;
     assert(state != NULL);
     assert(!atom_in_state_list((xcb_atom_t*)state->data, state->len, atoms._NET_WM_STATE_DEMANDS_ATTENTION));
 

@@ -148,6 +148,8 @@ void test_resize_logic(void) {
     assert(hot->desired.x == 100);
     assert(hot->desired.y == 100);
     printf("Test 1 Passed: Bottom-Right Resize\n");
+    s.interaction_pointer_x = 500;
+    s.interaction_pointer_y = 500;
 
     // Test 2: Left Resize (dx=-10)
     s.interaction_resize_dir = RESIZE_LEFT;
@@ -163,6 +165,8 @@ void test_resize_logic(void) {
     assert(hot->desired.h == 200);
     assert(hot->desired.y == 100);
     printf("Test 2 Passed: Left Resize\n");
+    s.interaction_pointer_x = 500;
+    s.interaction_pointer_y = 500;
 
     // Test 3: Top Resize (dy=-10)
     s.interaction_resize_dir = RESIZE_TOP;
@@ -178,6 +182,8 @@ void test_resize_logic(void) {
     assert(hot->desired.w == 200);
     assert(hot->desired.x == 100);
     printf("Test 3 Passed: Top Resize\n");
+    s.interaction_pointer_x = 500;
+    s.interaction_pointer_y = 500;
 
     // Test 4: Top-Left Resize (dx=-20, dy=-20)
     s.interaction_resize_dir = RESIZE_TOP | RESIZE_LEFT;

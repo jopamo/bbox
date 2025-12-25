@@ -227,6 +227,7 @@ static void test_strut_partial_invalid_ranges_ignored(void) {
     const struct stub_prop_call* wa = find_prop_call(s.root, atoms._NET_WORKAREA, false);
     assert(wa != NULL);
     const uint32_t* vals = (const uint32_t*)wa->data;
+    (void)vals;
     assert(vals[0] == 0);
     assert(vals[1] == 0);
     assert(vals[2] == 1920);
@@ -259,6 +260,7 @@ static void test_property_spam_no_crash(void) {
     }
 
     client_cold_t* cold = server_ccold(&s, h);
+    (void)cold;
     assert(cold->has_net_wm_name);
     assert(cold->base_title != NULL);
 

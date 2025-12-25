@@ -28,6 +28,7 @@
 #include <xcb/xcb_keysyms.h>
 
 #include "client.h"
+#include "cookie_jar.h"
 #include "event.h"
 #include "frame.h"
 #include "hxm.h"
@@ -116,6 +117,9 @@ void wm_update_monitors(server_t* s) {
         next_monitors[0].geom.w = (uint16_t)screen->width_in_pixels;
         next_monitors[0].geom.h = (uint16_t)screen->height_in_pixels;
         next_monitors[0].workarea = next_monitors[0].geom;
+        next_monitors[0].crtc = XCB_NONE;
+        next_monitors[0].mode = XCB_NONE;
+        next_monitors[0].refresh_ns = 8ull * 1000ull * 1000ull;  // default 8ms
     } else {
         xcb_randr_get_screen_resources_current_cookie_t r_c = xcb_randr_get_screen_resources_current(s->conn, s->root);
         xcb_randr_get_screen_resources_current_reply_t* res =
@@ -139,6 +143,9 @@ void wm_update_monitors(server_t* s) {
                         next_monitors[active_count].geom.w = crtc->width;
                         next_monitors[active_count].geom.h = crtc->height;
                         next_monitors[active_count].workarea = next_monitors[active_count].geom;
+                        next_monitors[active_count].crtc = crtcs[i];
+                        next_monitors[active_count].mode = crtc->mode;
+                        next_monitors[active_count].refresh_ns = 0;  // will be updated async later
                         active_count++;
                     }
                     free(crtc);
@@ -154,6 +161,15 @@ void wm_update_monitors(server_t* s) {
         s->monitor_count = active_count;
         LOG_INFO("Monitor update: %u monitors detected", s->monitor_count);
     }
+}
+
+void randr_request_snapshot(server_t* s) {
+    if (!s || !s->randr_supported) return;
+
+    xcb_randr_get_screen_resources_current_cookie_t ck = xcb_randr_get_screen_resources_current(s->conn, s->root);
+
+    cookie_jar_push(&s->cookie_jar, ck.sequence, COOKIE_RANDR_SCREEN_RESOURCES_CURRENT, HANDLE_INVALID, 0, s->txn_id,
+                    wm_handle_reply);
 }
 
 void wm_get_monitor_geometry(server_t* s, client_hot_t* hot, rect_t* out_geom) {
@@ -805,6 +821,11 @@ void wm_cancel_interaction(server_t* s) {
     s->interaction_handle = HANDLE_INVALID;
     s->interaction_resize_dir = RESIZE_NONE;
     s->interaction_time = 0;
+    // Clear interaction flush controller
+    s->interaction_refresh_ns = 0;
+    s->interaction_flush_spacing_ns = 0;
+    s->interaction_flush_deadline_ns = 0;
+    rl_reset(&s->interaction_flush_rl);
     xcb_ungrab_pointer(s->conn, XCB_CURRENT_TIME);
     if (frame != XCB_NONE) {
         client_hot_t* hot = server_chot(s, h);
@@ -838,6 +859,16 @@ void wm_start_interaction(server_t* s, handle_t h, client_hot_t* hot, bool start
     s->interaction_pointer_x = root_x;
     s->interaction_pointer_y = root_y;
     s->last_interaction_flush = 0;
+
+    // Initialize interaction flush controller
+    uint64_t now = monotonic_time_ns();
+    s->interaction_refresh_ns = server_refresh_ns_for_point(s, root_x, root_y);
+    s->interaction_flush_spacing_ns = interaction_spacing_ns(s->interaction_refresh_ns);
+    rl_reset(&s->interaction_flush_rl);
+    s->interaction_flush_deadline_ns = now + s->interaction_refresh_ns;
+    s->pending_flush = true;
+    s->x_poll_immediate = true;
+    s->force_poll_ticks = 2;
 
     xcb_cursor_t cursor = XCB_NONE;
     if (start_move) {
@@ -1120,6 +1151,25 @@ void wm_handle_motion_notify(server_t* s, xcb_motion_notify_event_t* ev) {
     hot->desired.h = h_val;
 
     hot->dirty |= DIRTY_GEOM;
+
+    // Update pointer position and refresh-aware flush scheduling
+    s->interaction_pointer_x = ev->root_x;
+    s->interaction_pointer_y = ev->root_y;
+
+    if (s->interaction_mode == INTERACTION_MOVE || s->interaction_mode == INTERACTION_RESIZE) {
+        uint64_t now = monotonic_time_ns();
+
+        // refresh can change if pointer crosses monitors
+        uint64_t rns = server_refresh_ns_for_point(s, ev->root_x, ev->root_y);
+        if (rns != 0 && rns != s->interaction_refresh_ns) {
+            s->interaction_refresh_ns = rns;
+            s->interaction_flush_spacing_ns = interaction_spacing_ns(rns);
+            rl_reset(&s->interaction_flush_rl);
+        }
+
+        s->interaction_flush_deadline_ns = now + s->interaction_refresh_ns;
+        s->pending_flush = true;
+    }
 }
 
 // EWMH client messages / state

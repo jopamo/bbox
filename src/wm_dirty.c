@@ -294,14 +294,23 @@ bool wm_flush_dirty(server_t* s, uint64_t now) {
                  s->interaction_window == hot->frame);
 
             if (interactive) {
-                uint64_t interval = 16666666;  // ~16ms for 60Hz
-                if (s->last_interaction_flush > 0 && (now - s->last_interaction_flush) < interval) {
-                    uint64_t remaining = interval - (now - s->last_interaction_flush);
-                    int ms = (int)(remaining / 1000000) + 1;
-                    server_schedule_timer(s, ms);
+                // Use adaptive refresh rate scheduling
+                uint64_t spacing_ns = s->interaction_flush_spacing_ns;
+                uint64_t deadline_ns = s->interaction_flush_deadline_ns;
+                if (spacing_ns == 0) spacing_ns = 16666666;  // fallback
+                if (!rl_allow(&s->interaction_flush_rl, now, spacing_ns) || now < deadline_ns) {
+                    // Too soon or before deadline, schedule wakeup at the later of spacing or deadline
+                    uint64_t next_spacing = s->interaction_flush_rl.last_ns + spacing_ns;
+                    uint64_t next_allowed = next_spacing > deadline_ns ? next_spacing : deadline_ns;
+                    if (next_allowed > now) {
+                        uint64_t remaining = next_allowed - now;
+                        int ms = (int)(remaining / 1000000) + 1;
+                        server_schedule_timer(s, ms);
+                    }
                     if (i < s->active_clients.length && s->active_clients.items[i] == ptr) i++;
                     continue;
                 }
+                // Flush allowed, update last_interaction_flush for legacy compatibility
                 s->last_interaction_flush = now;
             }
 

@@ -74,6 +74,7 @@ static void test_expose_coalesces_regions(void) {
     event_ingest(&s, true);
 
     dirty_region_t* region = hash_map_get(&s.buckets.expose_regions, 10);
+    (void)region;
     assert(region != NULL);
     assert(region->valid);
     assert(region->x == 10);

@@ -35,6 +35,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/epoll.h>
+#include <xcb/randr.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
@@ -149,7 +150,17 @@ typedef enum resize_dir {
 typedef struct monitor {
     rect_t geom;
     rect_t workarea;
+    xcb_randr_crtc_t crtc;
+    xcb_randr_mode_t mode;
+    uint64_t refresh_ns;
 } monitor_t;
+
+/* RandR mode cache */
+typedef struct randr_cache {
+    xcb_randr_mode_info_t* modes;
+    uint32_t modes_len;
+    uint64_t last_update_ns;
+} randr_cache_t;
 
 /* Main server state */
 typedef struct server {
@@ -266,6 +277,14 @@ typedef struct server {
     uint64_t txn_id; /* monotonic transaction id for cookie ordering */
     bool in_commit_phase;
     bool pending_flush;
+
+    randr_cache_t randr_cache;
+
+    /* interaction flush controller */
+    rl_t interaction_flush_rl;
+    uint64_t interaction_refresh_ns;
+    uint64_t interaction_flush_deadline_ns;
+    uint64_t interaction_flush_spacing_ns;
 
     /* Configuration */
     config_t config;

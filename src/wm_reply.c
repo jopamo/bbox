@@ -424,6 +424,62 @@ static bool check_transient_cycle(server_t* s, handle_t child, handle_t parent) 
     return false;
 }
 
+static void randr_cache_modes_from_reply(server_t* s, xcb_randr_get_screen_resources_current_reply_t* rr) {
+    if (!s || !rr) return;
+
+    int nmodes = xcb_randr_get_screen_resources_current_modes_length(rr);
+    xcb_randr_mode_info_t* modes = xcb_randr_get_screen_resources_current_modes(rr);
+
+    free(s->randr_cache.modes);
+    s->randr_cache.modes = NULL;
+    s->randr_cache.modes_len = 0;
+
+    if (nmodes <= 0) return;
+
+    size_t bytes = (size_t)nmodes * sizeof(xcb_randr_mode_info_t);
+    s->randr_cache.modes = (xcb_randr_mode_info_t*)malloc(bytes);
+    if (!s->randr_cache.modes) return;
+
+    memcpy(s->randr_cache.modes, modes, bytes);
+    s->randr_cache.modes_len = (uint32_t)nmodes;
+    s->randr_cache.last_update_ns = monotonic_time_ns();
+}
+
+static void randr_request_crtc_infos(server_t* s, xcb_randr_get_screen_resources_current_reply_t* rr) {
+    int ncrtcs = xcb_randr_get_screen_resources_current_crtcs_length(rr);
+    xcb_randr_crtc_t* crtcs = xcb_randr_get_screen_resources_current_crtcs(rr);
+
+    for (int i = 0; i < ncrtcs; i++) {
+        xcb_randr_get_crtc_info_cookie_t ck = xcb_randr_get_crtc_info(s->conn, crtcs[i], XCB_CURRENT_TIME);
+
+        cookie_jar_push(&s->cookie_jar, ck.sequence, COOKIE_RANDR_CRTC_INFO, HANDLE_INVALID, (uintptr_t)crtcs[i],
+                        s->txn_id, wm_handle_reply);
+    }
+}
+
+static void randr_apply_crtc_info(server_t* s, xcb_randr_crtc_t crtc, xcb_randr_get_crtc_info_reply_t* ci) {
+    if (!s || !ci) return;
+
+    xcb_randr_mode_t mode = ci->mode;
+    uint64_t refresh_ns = 0;
+
+    if (mode != XCB_NONE) {
+        const xcb_randr_mode_info_t* mi = randr_cache_find_mode(s, mode);
+        refresh_ns = hz_to_refresh_ns(randr_mode_hz(mi));
+    }
+
+    if (refresh_ns == 0) refresh_ns = 8ull * 1000ull * 1000ull;
+
+    // you likely have separate code that rebuilds monitors geom/workarea
+    // this attaches mode + refresh to the matching monitor entry
+    for (uint32_t i = 0; i < s->monitor_count; i++) {
+        if (s->monitors[i].crtc != crtc) continue;
+        s->monitors[i].mode = mode;
+        s->monitors[i].refresh_ns = refresh_ns;
+        break;
+    }
+}
+
 /*
  * wm_handle_reply:
  * Central callback for all async X11 replies.
@@ -488,6 +544,18 @@ void wm_handle_reply(server_t* s, const cookie_slot_t* slot, void* reply, xcb_ge
                     }
                 }
             }
+        } else if (slot->type == COOKIE_RANDR_SCREEN_RESOURCES_CURRENT) {
+            xcb_randr_get_screen_resources_current_reply_t* rr = reply;
+            if (rr) {
+                randr_cache_modes_from_reply(s, rr);
+                randr_request_crtc_infos(s, rr);
+            }
+            if (rr) free(rr);
+        } else if (slot->type == COOKIE_RANDR_CRTC_INFO) {
+            xcb_randr_get_crtc_info_reply_t* ci = reply;
+            xcb_randr_crtc_t crtc = (xcb_randr_crtc_t)slot->data;
+            if (ci) randr_apply_crtc_info(s, crtc, ci);
+            if (ci) free(ci);
         } else if (slot->type == COOKIE_GET_PROPERTY_FRAME_EXTENTS) {
             xcb_get_property_reply_t* r = (xcb_get_property_reply_t*)reply;
             xcb_window_t win = (xcb_window_t)slot->data;

@@ -856,6 +856,48 @@ static void log_unhandled_summary(void) {
     }
 }
 
+static bool server_interaction_should_flush(server_t* s, uint64_t now) {
+    if (!(s->interaction_mode == INTERACTION_MOVE || s->interaction_mode == INTERACTION_RESIZE)) return true;
+
+    if (!s->pending_flush) return false;
+
+    if (now >= s->interaction_flush_deadline_ns) return true;
+
+    if (rl_allow(&s->interaction_flush_rl, now, s->interaction_flush_spacing_ns)) return true;
+
+    return false;
+}
+
+static void server_schedule_timer_ns(server_t* s, uint64_t ns_from_now) {
+    uint64_t ms = (ns_from_now + 999999ull) / 1000000ull;
+    if (ms == 0) ms = 1;
+    if (ms > 1000) ms = 1000;
+    server_schedule_timer(s, (int)ms);
+}
+
+static void server_schedule_interaction_wakeup(server_t* s, uint64_t now) {
+    if (!(s->interaction_mode == INTERACTION_MOVE || s->interaction_mode == INTERACTION_RESIZE)) {
+        return;
+    }
+
+    if (!s->pending_flush) {
+        return;
+    }
+
+    uint64_t next_by_spacing = s->last_interaction_flush + s->interaction_flush_spacing_ns;
+    uint64_t next_by_deadline = s->interaction_flush_deadline_ns;
+
+    uint64_t next_ns = next_by_spacing;
+    if (next_by_deadline < next_ns) next_ns = next_by_deadline;
+
+    if (next_ns <= now) {
+        server_schedule_timer(s, 1);
+        return;
+    }
+
+    server_schedule_timer_ns(s, next_ns - now);
+}
+
 void event_process(server_t* s) {
     static rl_t rl_process = {0};
     uint64_t now = monotonic_time_ns();
@@ -1038,6 +1080,7 @@ void event_process(server_t* s) {
     // 11. RandR (coalesced)
     if (s->buckets.randr_dirty) {
         TRACE_LOG("process randr dirty width=%u height=%u", s->buckets.randr_width, s->buckets.randr_height);
+        randr_request_snapshot(s);
         wm_update_monitors(s);
         uint32_t geometry[] = {s->buckets.randr_width, s->buckets.randr_height};
         xcb_change_property(s->conn, XCB_PROP_MODE_REPLACE, s->root, atoms._NET_DESKTOP_GEOMETRY, XCB_ATOM_CARDINAL, 32,
@@ -1339,7 +1382,23 @@ void server_run(server_t* s) {
         event_ingest(s, x_ready);
         if (event_drain_cookies(s)) s->pending_flush = true;
         event_process(s);
-        if (wm_flush_dirty(s, start)) s->pending_flush = true;
+
+        bool do_flush = server_interaction_should_flush(s, monotonic_time_ns());
+
+        if (do_flush) {
+            s->in_commit_phase = true;
+            bool more = wm_flush_dirty(s, start);
+            s->in_commit_phase = false;
+
+            if (s->interaction_mode != INTERACTION_NONE) {
+                s->last_interaction_flush = monotonic_time_ns();
+            }
+
+            if (more) s->pending_flush = true;
+        }
+
+        server_schedule_interaction_wakeup(s, monotonic_time_ns());
+
         if (s->buckets.ingested > 0) s->pending_flush = true;
 
         // Fix 3: Debounced workarea calculation
@@ -1365,7 +1424,14 @@ void server_run(server_t* s) {
             next_timeout = -1;
         } else {
             uint64_t diff = 8000000 - (flush_now - last_flush_time);
-            next_timeout = (int)(diff / 1000000) + 1;
+            int timeout_ms = (int)(diff / 1000000) + 1;
+            // Consider interaction deadline
+            if (s->interaction_mode != INTERACTION_NONE && s->interaction_flush_deadline_ns > flush_now) {
+                uint64_t deadline_diff = s->interaction_flush_deadline_ns - flush_now;
+                int deadline_ms = (int)(deadline_diff / 1000000) + 1;
+                if (deadline_ms < timeout_ms) timeout_ms = deadline_ms;
+            }
+            next_timeout = timeout_ms;
         }
 
         log_unhandled_summary();

@@ -147,6 +147,8 @@ static void test_configure_request_applies_and_extents(void) {
     assert(stub_config_calls_len >= 2);
     const stub_config_call_t* frame_call = stub_config_call_at(0);
     const stub_config_call_t* client_call = stub_config_call_at(1);
+    (void)frame_call;
+    (void)client_call;
 
     assert(frame_call->win == hot->frame);
     assert(frame_call->x == 30);
@@ -163,6 +165,7 @@ static void test_configure_request_applies_and_extents(void) {
     assert(stub_last_prop_atom == atoms._NET_FRAME_EXTENTS);
     assert(stub_last_prop_len == 4);
     uint32_t* extents = (uint32_t*)stub_last_prop_data;
+    (void)extents;
     assert(extents[0] == s.config.theme.border_width);
     assert(extents[1] == s.config.theme.border_width);
     assert(extents[2] == s.config.theme.title_height + s.config.theme.border_width);
@@ -211,6 +214,7 @@ static void test_synthetic_configure_notify_sent(void) {
 
     assert(stub_send_event_count == 1);
     xcb_configure_notify_event_t* ev = (xcb_configure_notify_event_t*)stub_last_event;
+    (void)ev;
     assert((ev->response_type & ~0x80) == XCB_CONFIGURE_NOTIFY);
     assert(ev->window == hot->xid);
 
