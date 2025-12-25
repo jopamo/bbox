@@ -156,25 +156,6 @@ static bool prop_is_cardinal(const xcb_get_property_reply_t* r) {
     return r && r->type == XCB_ATOM_CARDINAL && r->format == 32;
 }
 
-static void client_set_colormap_windows(client_cold_t* cold, const xcb_window_t* wins, uint32_t count) {
-    const uint32_t max_windows = 64;
-    if (!cold) return;
-
-    if (cold->colormap_windows) {
-        free(cold->colormap_windows);
-        cold->colormap_windows = NULL;
-        cold->colormap_windows_len = 0;
-    }
-
-    if (!wins || count == 0) return;
-    if (count > max_windows) count = max_windows;
-
-    cold->colormap_windows = malloc(sizeof(xcb_window_t) * count);
-    if (!cold->colormap_windows) return;
-    memcpy(cold->colormap_windows, wins, sizeof(xcb_window_t) * count);
-    cold->colormap_windows_len = count;
-}
-
 static const size_t MAX_TITLE_BYTES = 4096;
 
 static size_t clamp_prop_len(int len, size_t max_len) {
@@ -264,20 +245,16 @@ static bool client_apply_decoration_hints(client_hot_t* hot) {
 
 static void abort_manage(server_t* s, handle_t h) {
     client_hot_t* hot = server_chot(s, h);
-    client_cold_t* cold = server_ccold(s, h);
-    if (!hot || !cold) return;
+    if (!hot) return;
 
     if (hot->xid != XCB_NONE) {
         // If we are aborting management (e.g. override_redirect or special type),
         // make sure the window is mapped so it appears.
         xcb_map_window(s->conn, hot->xid);
-        hash_map_remove(&s->window_to_client, hot->xid);
+        // client_destroy_resources will remove it from window_to_client
     }
 
-    arena_destroy(&cold->string_arena);
-    render_free(&hot->render_ctx);
-    if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
-
+    client_destroy_resources(s, h);
     slotmap_free(&s->clients, h);
 }
 
@@ -686,12 +663,13 @@ void wm_handle_reply(server_t* s, const cookie_slot_t* slot, void* reply, xcb_ge
                     int bytes = xcb_get_property_value_length(r);
                     if (bytes >= 4) {
                         uint32_t count = (uint32_t)(bytes / (int)sizeof(xcb_window_t));
-                        client_set_colormap_windows(cold, (xcb_window_t*)xcb_get_property_value(r), count);
+                        client_set_colormap_windows_arena(s, slot->client, (xcb_window_t*)xcb_get_property_value(r),
+                                                          count);
                     } else {
-                        client_set_colormap_windows(cold, NULL, 0);
+                        client_set_colormap_windows_arena(s, slot->client, NULL, 0);
                     }
                 } else {
-                    client_set_colormap_windows(cold, NULL, 0);
+                    client_set_colormap_windows_arena(s, slot->client, NULL, 0);
                 }
                 if (s->focused_client == slot->client) {
                     wm_install_client_colormap(s, hot);

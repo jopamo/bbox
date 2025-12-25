@@ -136,6 +136,14 @@ bool cookie_jar_push(cookie_jar_t* cj, uint32_t sequence, cookie_type_t type, ha
  */
 void cookie_jar_drain(cookie_jar_t* cj, xcb_connection_t* conn, struct server* s, size_t max_replies);
 
+/* Cancel all pending cookies for a specific client
+ *
+ * Removes slots matching the client handle. Handlers are NOT called.
+ * This should be used when a client is being destroyed to prevent
+ * late replies from accessing freed client memory.
+ */
+void cookie_jar_cancel_client(cookie_jar_t* cj, handle_t client);
+
 static inline bool cookie_jar_has_pending(const cookie_jar_t* cj) { return cj && cj->live_count > 0; }
 
 /* Optional helpers for diagnostics */

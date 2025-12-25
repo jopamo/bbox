@@ -334,6 +334,7 @@ static void test_destroy_notify_unmanages_and_destroys_frame(void) {
     assert(s.focused_client == h);
 
     stub_destroy_window_count = 0;
+    xcb_window_t expected_frame = hot->frame;
 
     xcb_destroy_notify_event_t destroy;
     memset(&destroy, 0, sizeof(destroy));
@@ -343,7 +344,7 @@ static void test_destroy_notify_unmanages_and_destroys_frame(void) {
 
     assert(server_get_client_by_window(&s, hot->xid) == HANDLE_INVALID);
     assert(stub_destroy_window_count == 1);
-    assert(stub_last_destroyed_window == hot->frame);
+    assert(stub_last_destroyed_window == expected_frame);
     assert(s.focused_client == HANDLE_INVALID);
 
     printf("test_destroy_notify_unmanages_and_destroys_frame passed\n");

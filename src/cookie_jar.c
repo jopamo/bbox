@@ -215,3 +215,38 @@ void cookie_jar_drain(cookie_jar_t* cj, xcb_connection_t* conn, struct server* s
 
     cj->scan_cursor = idx;
 }
+
+void cookie_jar_cancel_client(cookie_jar_t* cj, handle_t client) {
+    if (!cj || cj->live_count == 0) return;
+
+    for (size_t i = 0; i < cj->cap; i++) {
+        if (cj->slots[i].live && cj->slots[i].client == client) {
+            // Remove without calling handler
+            cookie_jar_remove(cj, i);
+
+            // Because cookie_jar_remove performs backshift deletion,
+            // the slot at 'i' might now be occupied by a different element
+            // that was shifted back. We must re-check 'i'.
+            // However, since we are iterating linearly and remove preserves
+            // the property that elements are at or after their home, and we
+            // process the whole array, we need to be careful.
+
+            // Standard backshift deletion might move an element we haven't seen yet
+            // to the current position (i).
+            // So we should decrement i to re-process this slot.
+            // But 'i' is unsigned, so be careful.
+
+            if (i > 0)
+                i--;
+            else {
+                // If i was 0, we can't decrement.
+                // But loop increment will make it 0 + 1 = 1.
+                // We want to check 0 again.
+                // The easiest way with unsigned loop is to rely on standard pattern:
+                // i-- works if we weren't at 0.
+                // If we are at 0, we can set i = -1 (SIZE_MAX) so next increment makes it 0.
+                i = SIZE_MAX;
+            }
+        }
+    }
+}

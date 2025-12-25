@@ -27,6 +27,7 @@ static void setup_server(server_t* s) {
     hash_map_init(&s->frame_to_client);
     for (int i = 0; i < LAYER_COUNT; i++) small_vec_init(&s->layers[i]);
 
+    cookie_jar_init(&s->cookie_jar);
     slotmap_init(&s->clients, 16, sizeof(client_hot_t), sizeof(client_cold_t));
 }
 
@@ -34,18 +35,10 @@ static void cleanup_server(server_t* s) {
     for (uint32_t i = 1; i < s->clients.cap; i++) {
         if (s->clients.hdr[i].live) {
             handle_t h = handle_make(i, s->clients.hdr[i].gen);
-            client_hot_t* hot = server_chot(s, h);
-            client_cold_t* cold = server_ccold(s, h);
-            if (cold) {
-                if (cold->colormap_windows) free(cold->colormap_windows);
-                arena_destroy(&cold->string_arena);
-            }
-            if (hot) {
-                render_free(&hot->render_ctx);
-                if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
-            }
+            client_destroy_resources(s, h);
         }
     }
+    cookie_jar_destroy(&s->cookie_jar);
     slotmap_destroy(&s->clients);
     hash_map_destroy(&s->window_to_client);
     hash_map_destroy(&s->frame_to_client);
@@ -106,15 +99,12 @@ static void test_colormap_windows_list_install(void) {
 
     handle_t h = add_client(&s, 200, 210);
     client_hot_t* hot = server_chot(&s, h);
-    client_cold_t* cold = server_ccold(&s, h);
     hot->colormap = 20;
     hot->frame_colormap_owned = true;
     hot->frame_colormap = 21;
 
-    cold->colormap_windows_len = 2;
-    cold->colormap_windows = malloc(sizeof(xcb_window_t) * 2);
-    cold->colormap_windows[0] = hot->xid;
-    cold->colormap_windows[1] = hot->frame;
+    xcb_window_t wins[] = {hot->xid, hot->frame};
+    client_set_colormap_windows_arena(&s, h, wins, 2);
 
     stub_install_colormap_count = 0;
     wm_set_focus(&s, h);
@@ -167,11 +157,10 @@ static void test_colormap_notify_triggers_install(void) {
 
     handle_t h = add_client(&s, 400, 410);
     client_hot_t* hot = server_chot(&s, h);
-    client_cold_t* cold = server_ccold(&s, h);
     hot->colormap = 40;
-    cold->colormap_windows_len = 1;
-    cold->colormap_windows = malloc(sizeof(xcb_window_t));
-    cold->colormap_windows[0] = hot->xid;
+
+    xcb_window_t wins[] = {hot->xid};
+    client_set_colormap_windows_arena(&s, h, wins, 1);
 
     wm_set_focus(&s, h);
     stub_install_colormap_count = 0;

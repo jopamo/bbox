@@ -249,13 +249,8 @@ void menu_show_client_list(server_t* s, int16_t x, int16_t y) {
         client_hot_t* hot = server_chot(s, h);
         if (!cold || !hot) continue;
 
-        char label[256];
-        if (hot->state == STATE_UNMAPPED) {
-            snprintf(label, sizeof(label), "[%s]", cold->title ? cold->title : "Unnamed");
-        } else {
-            snprintf(label, sizeof(label), "%s", cold->title ? cold->title : "Unnamed");
-        }
-        menu_add_item(s, label, MENU_ACTION_RESTORE, NULL, h, NULL);
+        // Pass NULL label to fetch title on demand during render
+        menu_add_item(s, NULL, MENU_ACTION_RESTORE, NULL, h, NULL);
     }
 
     if (s->menu.items.length == 0) {
@@ -410,7 +405,26 @@ void menu_handle_expose_region(server_t* s, const dirty_region_t* dirty) {
 
         rgba_t text_color = selected ? sel_fg : fg;
         cairo_set_source_rgba(cr, text_color.r, text_color.g, text_color.b, text_color.a);
-        pango_layout_set_text(s->menu.render_ctx.layout, item->label ? item->label : "", -1);
+
+        const char* text = item->label;
+        char temp_label[256];
+
+        if (!text && s->menu.is_client_list && item->client != HANDLE_INVALID) {
+            client_hot_t* hot = server_chot(s, item->client);
+            client_cold_t* cold = server_ccold(s, item->client);
+            if (hot && cold) {
+                if (hot->state == STATE_UNMAPPED) {
+                    snprintf(temp_label, sizeof(temp_label), "[%s]", cold->title ? cold->title : "Unnamed");
+                    text = temp_label;
+                } else {
+                    text = cold->title ? cold->title : "Unnamed";
+                }
+            } else {
+                text = "(Invalid)";
+            }
+        }
+
+        pango_layout_set_text(s->menu.render_ctx.layout, text ? text : "", -1);
         pango_layout_set_width(s->menu.render_ctx.layout, (s->menu.w - text_x_offset - MENU_PADDING) * PANGO_SCALE);
         pango_layout_set_ellipsize(s->menu.render_ctx.layout, PANGO_ELLIPSIZE_END);
         int text_h;

@@ -14,7 +14,9 @@
  * Contracts:
  * - Hot/cold memory is stable for the lifetime of the handle generation
  * - Do not store raw pointers to hot/cold across operations that may realloc the slotmap
- * - Strings in client_cold_t may be owned by string_arena or heap depending on implementation
+ * - ALL pointers in client_cold_t (strings, arrays) are owned by string_arena
+ * - string_arena is destroyed ONLY during client_destroy_resources (unmanage)
+ * - Do not free() members of client_cold_t manually
  *
  * Threading:
  * - Not thread-safe
@@ -328,6 +330,12 @@ void client_manage_start(server_t* s, xcb_window_t win);
 void client_finish_manage(server_t* s, handle_t h);
 void client_unmanage(server_t* s, handle_t h);
 void client_close(server_t* s, handle_t h);
+
+/* Resource cleanup helper - centralized destruction path */
+void client_destroy_resources(server_t* s, handle_t h);
+
+/* Set colormap windows using the client's cold arena */
+void client_set_colormap_windows_arena(server_t* s, handle_t h, const xcb_window_t* wins, uint32_t count);
 
 /* Helpers */
 void client_constrain_size(const size_hints_t* hints, uint32_t flags, uint16_t* w, uint16_t* h);

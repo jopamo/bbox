@@ -19,6 +19,7 @@
 #include <string.h>
 #include <xcb/xcb_icccm.h>
 
+#include "cookie_jar.h"
 #include "event.h"
 #include "frame.h"
 #include "hxm.h"
@@ -724,6 +725,100 @@ void client_finish_manage(server_t* s, handle_t h) {
 }
 
 /*
+ * client_destroy_resources:
+ * Centralized cleanup path for all per-client resources.
+ * This function MUST be idempotent and safe to call on partially destroyed clients.
+ * It frees all memory and X resources owned by the client/frame.
+ * It does NOT perform logical unmanagement (stacking, focus, reparenting).
+ */
+void client_destroy_resources(server_t* s, handle_t h) {
+    client_hot_t* hot = server_chot(s, h);
+    client_cold_t* cold = server_ccold(s, h);
+    if (!hot || !cold) return;
+
+    TRACE_LOG("destroy_resources h=%lx xid=%u frame=%u", h, hot->xid, hot->frame);
+
+    // 1. Cancel pending cookies
+    cookie_jar_cancel_client(&s->cookie_jar, h);
+
+    // 2. Destroy Damage
+    if (hot->damage != XCB_NONE) {
+        xcb_damage_destroy(s->conn, hot->damage);
+        hot->damage = XCB_NONE;
+    }
+    dirty_region_reset(&hot->damage_region);
+
+    // 3. Destroy Frame Window
+    if (hot->frame != XCB_NONE) {
+        // Remove from lookup map first
+        hash_map_remove(&s->frame_to_client, hot->frame);
+
+        TRACE_LOG("destroy_resources destroy frame=%u", hot->frame);
+        xcb_destroy_window(s->conn, hot->frame);
+        hot->frame = XCB_NONE;
+    }
+
+    // 4. Free Colormap (if we own a custom one for the frame)
+    if (hot->frame_colormap_owned && hot->frame_colormap != XCB_NONE) {
+        xcb_free_colormap(s->conn, hot->frame_colormap);
+        hot->frame_colormap = XCB_NONE;
+        hot->frame_colormap_owned = false;
+    }
+
+    // 5. Cleanup Client Window Map
+    // We stop tracking the client window xid.
+    if (hot->xid != XCB_NONE) {
+        hash_map_remove(&s->window_to_client, hot->xid);
+        // Note: we do NOT destroy hot->xid, that belongs to the client application.
+    }
+
+    // 6. Free Render Resources
+    render_free(&hot->render_ctx);
+    if (hot->icon_surface) {
+        cairo_surface_destroy(hot->icon_surface);
+        hot->icon_surface = NULL;
+    }
+
+    // 7. Destroy Cold Arena (Frees all strings, arrays, etc.)
+    arena_destroy(&cold->string_arena);
+    cold->colormap_windows = NULL;
+    cold->colormap_windows_len = 0;
+
+    // 8. Poison for debug safety
+#ifdef HXM_ENABLE_DEBUG_LOGGING
+    cold->title = (char*)0xDEADDEADDEADDEAD;
+    cold->base_title = (char*)0xDEADDEADDEADDEAD;
+    cold->wm_class = (char*)0xDEADDEADDEADDEAD;
+    cold->colormap_windows = (xcb_window_t*)0xDEADDEADDEADDEAD;
+#endif
+}
+
+void client_set_colormap_windows_arena(server_t* s, handle_t h, const xcb_window_t* wins, uint32_t count) {
+    client_cold_t* cold = server_ccold(s, h);
+    if (!cold) return;
+
+    // Note: We do not free the old array because it is arena-allocated.
+    // It will be freed when the client is unmanaged/destroyed.
+
+    if (count == 0 || !wins) {
+        cold->colormap_windows = NULL;
+        cold->colormap_windows_len = 0;
+        return;
+    }
+
+    const uint32_t max_windows = 64;
+    if (count > max_windows) count = max_windows;
+
+    size_t size = count * sizeof(xcb_window_t);
+    xcb_window_t* new_wins = arena_alloc(&cold->string_arena, size);
+    if (new_wins) {
+        memcpy(new_wins, wins, size);
+        cold->colormap_windows = new_wins;
+        cold->colormap_windows_len = count;
+    }
+}
+
+/*
  * client_unmanage:
  * Stop managing a window (e.g., it was closed or destroyed).
  *
@@ -735,7 +830,6 @@ void client_finish_manage(server_t* s, handle_t h) {
  */
 void client_unmanage(server_t* s, handle_t h) {
     client_hot_t* hot = server_chot(s, h);
-    client_cold_t* cold = server_ccold(s, h);
     if (!hot || hot->state == STATE_UNMANAGING || hot->state == STATE_UNMANAGED) return;
 
     bool destroyed = (hot->state == STATE_DESTROYED);
@@ -848,46 +942,23 @@ void client_unmanage(server_t* s, handle_t h) {
 
         TRACE_LOG("unmanage reparent xid=%u -> root (%d,%d)", hot->xid, root_x, root_y);
         xcb_reparent_window(s->conn, hot->xid, s->root, root_x, root_y);
-    }
 
-    if (hot->damage != XCB_NONE) {
-        xcb_damage_destroy(s->conn, hot->damage);
-        hot->damage = XCB_NONE;
-        dirty_region_reset(&hot->damage_region);
-    }
+        if (hot->damage != XCB_NONE) {
+            xcb_damage_destroy(s->conn, hot->damage);
+            hot->damage = XCB_NONE;
+            dirty_region_reset(&hot->damage_region);
+        }
 
-    // Destroy frame
-    if (hot->frame != XCB_NONE) {
-        TRACE_LOG("unmanage destroy frame=%u", hot->frame);
-        xcb_destroy_window(s->conn, hot->frame);
-    }
-
-    if (hot->frame_colormap_owned && hot->frame_colormap != XCB_NONE) {
-        xcb_free_colormap(s->conn, hot->frame_colormap);
-        hot->frame_colormap = XCB_NONE;
-        hot->frame_colormap_owned = false;
-    }
-
-    // Cleanup maps and properties
-    if (hot->xid != XCB_NONE) {
+        // Remove properties we set
         xcb_delete_property(s->conn, hot->xid, atoms.WM_STATE);
-        if (!destroyed && !s->restarting) {
+        if (!s->restarting) {
             xcb_delete_property(s->conn, hot->xid, atoms._NET_WM_DESKTOP);
             xcb_delete_property(s->conn, hot->xid, atoms._NET_WM_STATE);
         }
-        hash_map_remove(&s->window_to_client, hot->xid);
     }
-    if (hot->frame != XCB_NONE) hash_map_remove(&s->frame_to_client, hot->frame);
 
-    // Free cold data
-    arena_destroy(&cold->string_arena);
-    if (cold->colormap_windows) {
-        free(cold->colormap_windows);
-        cold->colormap_windows = NULL;
-        cold->colormap_windows_len = 0;
-    }
-    render_free(&hot->render_ctx);
-    if (hot->icon_surface) cairo_surface_destroy(hot->icon_surface);
+    // Call centralized resource cleanup
+    client_destroy_resources(s, h);
 
     // Free slot
     slotmap_free(&s->clients, h);
